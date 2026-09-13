@@ -1,22 +1,20 @@
 package cli
 
-import (
-	"github.com/spf13/cobra"
-)
-
-func NewRootCommand() *cobra.Command {
-	rootCmd := &cobra.Command{
-		Use:   "skiller",
-		Short: "AI Skill Visibility Manager",
-		Long: `Skiller controls which installed AI skills are visible
-to coding agents through the shared .agents/skills convention.`,
-	}
-
-	rootCmd.AddCommand(NewListCommand())
-
-	return rootCmd
-}
+import "github.com/spf13/cobra"
 
 func Execute() error {
-	return NewRootCommand().Execute()
+	return newRootCommand().Execute()
+}
+
+func newRootCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:           "skiller",
+		Short:         "AI Skill Visibility Manager",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+	}
+
+	cmd.AddCommand(newListCommand())
+
+	return cmd
 }
