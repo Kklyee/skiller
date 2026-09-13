@@ -1,4 +1,4 @@
-package cli
+package command
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newListCommand() *cobra.Command {
+func NewList() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List installed skills",

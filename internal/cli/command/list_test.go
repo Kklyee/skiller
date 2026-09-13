@@ -1,4 +1,4 @@
-package cli
+package command
 
 import (
 	"bytes"
@@ -23,8 +23,7 @@ func TestListCommand(t *testing.T) {
 
 	var output bytes.Buffer
 
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"list"})
+	cmd := NewList()
 	cmd.SetOut(&output)
 	cmd.SetErr(&output)
 
