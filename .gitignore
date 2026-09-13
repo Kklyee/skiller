@@ -1,0 +1,20 @@
+# Build
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+*.test
+*.out
+coverage.out
+
+.idea/
+.vscode/
+
+.DS_Store
+Thumbs.db
+
+.tmp/
