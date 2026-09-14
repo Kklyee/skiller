@@ -834,7 +834,7 @@ func (m *Model) openDeleteGroup() {
 
 func (m *Model) viewMain() string {
 	header := m.viewHeader()
-	bodyHeight := m.height - 8
+	bodyHeight := m.height - 10
 	if bodyHeight < 3 {
 		bodyHeight = 3
 	}
@@ -959,7 +959,7 @@ func (m *Model) viewHeader() string {
 }
 
 func (m *Model) viewBrand() string {
-	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("◆ SKILLER")
+	return startupLogo(startupFrameCount - 1)
 }
 
 func headerMetric(label string, value int, color string) string {

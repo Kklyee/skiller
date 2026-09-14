@@ -61,7 +61,7 @@ func TestMainViewAndKeyboardInteractions(t *testing.T) {
 	}
 	model.Update(bubbletea.WindowSizeMsg{Width: 120, Height: 30})
 	view := viewText(&model)
-	for _, want := range []string{"◆ SKILLER", "alpha", "beta", "coding", "Details", "Active", "Disabled"} {
+	for _, want := range []string{"Skill Visibility Manager", "alpha", "beta", "coding", "Details", "Active", "Disabled"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("view missing %q:\n%s", want, view)
 		}
@@ -186,7 +186,7 @@ func TestMainColumnWidthsConstrainLargePanels(t *testing.T) {
 	}
 }
 
-func TestMainLogoOccupiesItsOwnRowAboveSummary(t *testing.T) {
+func TestMainUsesPersistentStartupLogoAboveSummary(t *testing.T) {
 	root := t.TempDir()
 	model, err := NewModel(paths.Set{
 		Active:   filepath.Join(root, "active"),
@@ -200,18 +200,22 @@ func TestMainLogoOccupiesItsOwnRowAboveSummary(t *testing.T) {
 	}
 
 	lines := strings.Split(viewText(&model), "\n")
-	logoIndex := -1
+	logoStart := -1
+	logoEnd := -1
 	headerIndex := -1
 	for index, line := range lines {
-		if strings.Contains(line, "◆ SKILLER") {
-			logoIndex = index
+		if strings.Contains(line, "╭─╮") {
+			logoStart = index
+		}
+		if strings.Contains(line, "Skill Visibility Manager") {
+			logoEnd = index
 		}
 		if strings.Contains(line, "Installed") {
 			headerIndex = index
 		}
 	}
-	if logoIndex < 0 || headerIndex != logoIndex+1 {
-		t.Fatalf("logo/header rows are not stacked: logo=%d header=%d\n%s", logoIndex, headerIndex, viewText(&model))
+	if logoStart < 0 || logoEnd != logoStart+2 || headerIndex != logoEnd+1 {
+		t.Fatalf("persistent logo/header rows are not stacked: start=%d end=%d header=%d\n%s", logoStart, logoEnd, headerIndex, viewText(&model))
 	}
 }
 
@@ -963,11 +967,11 @@ func TestFocusedPanelsHaveVisibleBorders(t *testing.T) {
 	}
 	model.Update(bubbletea.WindowSizeMsg{Width: 120, Height: 30})
 
-	if got := strings.Count(viewText(&model), "╭"); got != 1 {
+	if got := strings.Count(viewText(&model), "╭────────────────"); got != 1 {
 		t.Fatalf("groups focus border count = %d, want 1:\n%s", got, viewText(&model))
 	}
 	model.Update(keyCode(bubbletea.KeyTab))
-	if got := strings.Count(viewText(&model), "╭"); got != 1 {
+	if got := strings.Count(viewText(&model), "╭────────────────"); got != 1 {
 		t.Fatalf("skills focus border count = %d, want 1:\n%s", got, viewText(&model))
 	}
 }
