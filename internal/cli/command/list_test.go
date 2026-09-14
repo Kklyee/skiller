@@ -50,6 +50,34 @@ func TestListCommand(t *testing.T) {
 	assertFields(t, lines[3], "research", "active")
 }
 
+func TestListCommandSurfacesInstallerConflict(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	createSkill(t, activeDir, "research")
+	createSkill(t, disabledDir, "research")
+
+	t.Setenv("SKILLER_ACTIVE_DIR", activeDir)
+	t.Setenv("SKILLER_DISABLED_DIR", disabledDir)
+
+	var output bytes.Buffer
+	cmd := NewList()
+	cmd.SetOut(&output)
+	cmd.SetErr(&output)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute list command: %v", err)
+	}
+	if !strings.Contains(output.String(), "research") || !strings.Contains(output.String(), "conflict") {
+		t.Fatalf("conflict missing from list:\n%s", output.String())
+	}
+	if _, err := os.Stat(filepath.Join(activeDir, "research", "SKILL.md")); err != nil {
+		t.Fatalf("active copy was removed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(disabledDir, "research", "SKILL.md")); err != nil {
+		t.Fatalf("disabled copy was removed: %v", err)
+	}
+}
+
 func createSkill(
 	t *testing.T,
 	parent string,

@@ -43,6 +43,38 @@ func TestScan(t *testing.T) {
 	}
 }
 
+func TestScanDetectsInstallerRecreatedActiveCopy(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+
+	createTestSkill(t, disabledDir, "research")
+	createTestSkill(t, activeDir, "research")
+
+	skills, err := Scan(activeDir, disabledDir)
+	if err != nil {
+		t.Fatalf("scan skills: %v", err)
+	}
+	if len(skills) != 1 {
+		t.Fatalf("skills: got %d, want 1", len(skills))
+	}
+	if skills[0].State != StateConflict {
+		t.Fatalf("state: got %s, want conflict", skills[0].State)
+	}
+	if skills[0].ActivePath != filepath.Join(activeDir, "research") {
+		t.Fatalf("active path: %q", skills[0].ActivePath)
+	}
+	if skills[0].DisabledPath != filepath.Join(disabledDir, "research") {
+		t.Fatalf("disabled path: %q", skills[0].DisabledPath)
+	}
+	if _, err := os.Stat(skills[0].ActiveSkillFile); err != nil {
+		t.Fatalf("active copy was removed: %v", err)
+	}
+	if _, err := os.Stat(skills[0].DisabledSkillFile); err != nil {
+		t.Fatalf("disabled copy was removed: %v", err)
+	}
+}
+
 func TestScanBrokenAndSymlinkSkills(t *testing.T) {
 	root := t.TempDir()
 

@@ -82,6 +82,31 @@ func TestMainViewAndKeyboardInteractions(t *testing.T) {
 	}
 }
 
+func TestConflictFromExternalInstallerIsVisible(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	createSkill(t, activeDir, "research", "Research", "Active copy")
+	createSkill(t, disabledDir, "research", "Research", "Disabled copy")
+
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: disabledDir,
+		Groups:   filepath.Join(root, "groups"),
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	view := model.View()
+	for _, want := range []string{"Conflict 1", "research", "conflict", "!"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("view missing %q:\n%s", want, view)
+		}
+	}
+}
+
 func TestReconcileModalAppliesGroup(t *testing.T) {
 	root := t.TempDir()
 	activeDir := filepath.Join(root, "active")

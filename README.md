@@ -19,3 +19,8 @@ skills = ["code-review", "tdd"]
 Run `skiller sync` to apply the project configuration. To synchronize and
 launch an installed coding agent, use `skiller run codex`, `skiller run
 gemini`, or `skiller run opencode`.
+
+Skiller rescans the active and disabled directories on every operation, so
+external installers remain compatible. If an installer recreates an active
+copy of a disabled skill, Skiller reports a conflict and preserves both
+copies.
