@@ -280,7 +280,7 @@ func TestCreatingGroupOpensSkillSelector(t *testing.T) {
 	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{' '}})
 	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyDown})
 	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{' '}})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'s'}})
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEnter})
 
 	created, err := group.New(groupsDir).Get("coding")
 	if err != nil {

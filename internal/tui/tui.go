@@ -314,7 +314,7 @@ func (m *Model) updateEditor(message bubbletea.KeyMsg) bubbletea.Cmd {
 			id := m.editorSkills[m.editorIndex]
 			m.editorChosen[id] = !m.editorChosen[id]
 		}
-	case "s":
+	case "enter":
 		m.saveEditor()
 	}
 	return nil
@@ -943,7 +943,7 @@ func (m *Model) viewGroupEditor() string {
 		renderKeyHints(
 			keyHint{key: "↑↓/jk", description: "move"},
 			keyHint{key: "space", description: "select"},
-			keyHint{key: "s", description: "save"},
+			keyHint{key: "enter", description: "save"},
 			keyHint{key: "esc", description: "cancel"},
 		),
 	}, "\n")
