@@ -236,6 +236,17 @@ func (m *Model) viewDetailsPanel() string {
 		"Status: " + stateStyle(skill.State).Render(skill.State.String()),
 		"Groups: " + strings.Join(groups, ", "),
 	}
+	if origin, ok := m.provenance[skill.ID]; ok {
+		if origin.Source == "" {
+			origin.Source = sourceLine(skill)
+		}
+		lines = append(lines,
+			"Source: "+valueOrDash(origin.Source),
+			"Repository: "+valueOrDash(origin.Repository),
+			"Installer: "+valueOrDash(origin.Installer),
+			"Revision: "+valueOrDash(origin.Revision),
+		)
+	}
 	pinned := "no"
 	if m.isPinned(skill.ID) {
 		pinned = pinStyle().Render("yes")

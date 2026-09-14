@@ -12,18 +12,20 @@ const (
 	groupsDirEnv   = "SKILLER_GROUPS_DIR"
 	profilesDirEnv = "SKILLER_PROFILES_DIR"
 	pinsFileEnv    = "SKILLER_PINS_FILE"
+	provenanceEnv  = "SKILLER_PROVENANCE_FILE"
 	journalEnv     = "SKILLER_TRANSACTION_JOURNAL"
 	lockEnv        = "SKILLER_LOCK"
 )
 
 type Set struct {
-	Active   string
-	Disabled string
-	Groups   string
-	Profiles string
-	Pins     string
-	Journal  string
-	Lock     string
+	Active     string
+	Disabled   string
+	Groups     string
+	Profiles   string
+	Pins       string
+	Provenance string
+	Journal    string
+	Lock       string
 }
 
 func Default() (Set, error) {
@@ -57,15 +59,20 @@ func Default() (Set, error) {
 	if value, ok := os.LookupEnv(pinsFileEnv); ok && value != "" {
 		pins = value
 	}
+	provenance := filepath.Join(filepath.Dir(disabled), "provenance.toml")
+	if value, ok := os.LookupEnv(provenanceEnv); ok && value != "" {
+		provenance = value
+	}
 
 	return Set{
-		Active:   active,
-		Disabled: disabled,
-		Groups:   groups,
-		Profiles: profiles,
-		Pins:     pins,
-		Journal:  JournalPath(disabled),
-		Lock:     LockPath(disabled),
+		Active:     active,
+		Disabled:   disabled,
+		Groups:     groups,
+		Profiles:   profiles,
+		Pins:       pins,
+		Provenance: provenance,
+		Journal:    JournalPath(disabled),
+		Lock:       LockPath(disabled),
 	}, nil
 }
 

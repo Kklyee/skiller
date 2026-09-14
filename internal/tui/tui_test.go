@@ -16,6 +16,7 @@ import (
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/paths"
 	"github.com/Kklyee/skiller/internal/pin"
+	skillprovenance "github.com/Kklyee/skiller/internal/provenance"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -103,6 +104,40 @@ func TestMainViewAndKeyboardInteractions(t *testing.T) {
 	model.Update(keyText("g"))
 	if !strings.Contains(viewText(&model), "Skiller / Groups") {
 		t.Fatalf("groups screen missing:\n%s", viewText(&model))
+	}
+}
+
+func TestDetailsPanelShowsSkillProvenance(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	provenancePath := filepath.Join(root, "provenance.toml")
+	createSkill(t, activeDir, "research", "Research", "Research skill")
+	if err := skillprovenance.New(provenancePath).Set("research", skillprovenance.Entry{
+		Source:     "github",
+		Repository: "owner/repo",
+		Installer:  "skills",
+		Revision:   "abc123",
+	}); err != nil {
+		t.Fatalf("set provenance: %v", err)
+	}
+
+	model, err := NewModel(paths.Set{
+		Active:     activeDir,
+		Disabled:   filepath.Join(root, "disabled"),
+		Provenance: provenancePath,
+		Groups:     filepath.Join(root, "groups"),
+		Journal:    filepath.Join(root, "transaction.json"),
+		Lock:       filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+
+	text := viewText(&model)
+	for _, want := range []string{"Source: github", "Repository: owner/repo", "Installer: skills", "Revision: abc123"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("details missing %q:\n%s", want, text)
+		}
 	}
 }
 

@@ -46,7 +46,7 @@ func NewRootCommand() *cobra.Command {
 
 	cmd.AddCommand(
 		command.NewList(),
-		command.NewProvenance(),
+		command.NewInfo(),
 		command.NewDisable(),
 		command.NewEnable(),
 		command.NewStatus(),

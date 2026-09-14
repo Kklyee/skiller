@@ -96,7 +96,7 @@ skiller unpin tdd
 ## Skill 来源
 
 ```bash
-skiller provenance code-review
+skiller info code-review
 ```
 
 该命令用于确认 Skill 当前来自 active 还是 disabled 目录，以及它是普通目录、
@@ -181,6 +181,7 @@ Skiller 不删除或修改 Skill 的 `SKILL.md`。批量切换使用事务和锁
 | Groups | `~/.skiller/groups` | `SKILLER_GROUPS_DIR` |
 | Profiles | `~/.skiller/profiles` | `SKILLER_PROFILES_DIR` |
 | Pins | `~/.skiller/pins.toml` | `SKILLER_PINS_FILE` |
+| Provenance | `~/.skiller/provenance.toml` | `SKILLER_PROVENANCE_FILE` |
 | Transaction journal | `~/.skiller/transaction.json` | `SKILLER_TRANSACTION_JOURNAL` |
 | Operation lock | `~/.skiller/lock` | `SKILLER_LOCK` |
 
@@ -192,7 +193,7 @@ skiller list
 skiller status
 skiller enable <skill>
 skiller disable <skill>
-skiller provenance <skills...>
+skiller info <skill>
 skiller pin <skills...>
 skiller unpin <skills...>
 skiller pins

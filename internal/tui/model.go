@@ -7,6 +7,7 @@ import (
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/paths"
 	"github.com/Kklyee/skiller/internal/pin"
+	skillprovenance "github.com/Kklyee/skiller/internal/provenance"
 	"github.com/Kklyee/skiller/internal/reconcile"
 	"github.com/Kklyee/skiller/internal/transaction"
 	"github.com/Kklyee/skiller/internal/visibility"
@@ -43,10 +44,11 @@ const (
 type Model struct {
 	paths paths.Set
 
-	skills  []catalog.Skill
-	groups  []group.Group
-	pins    []string
-	summary catalog.Summary
+	skills     []catalog.Skill
+	groups     []group.Group
+	pins       []string
+	provenance map[string]skillprovenance.Entry
+	summary    catalog.Summary
 
 	screen Screen
 	focus  Focus
@@ -117,10 +119,15 @@ func (m *Model) refresh() error {
 	if err != nil {
 		return err
 	}
+	provenanceData, err := skillprovenance.New(m.paths.Provenance).List()
+	if err != nil {
+		return err
+	}
 
 	m.skills = skills
 	m.groups = groups
 	m.pins = pinned
+	m.provenance = provenanceData
 	m.activeGroup = findActiveGroup(groups, skills)
 	m.summary = catalog.Summarize(skills)
 	m.summary.ActiveDir = m.paths.Active
