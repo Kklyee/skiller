@@ -334,6 +334,68 @@ func TestHelpViewUsesSemanticStyles(t *testing.T) {
 	}
 }
 
+func TestEmptyGroupNameKeepsCreationDialogOpen(t *testing.T) {
+	root := t.TempDir()
+	model, err := NewModel(paths.Set{
+		Active:   filepath.Join(root, "active"),
+		Disabled: filepath.Join(root, "disabled"),
+		Groups:   filepath.Join(root, "groups"),
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'g'}})
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'n'}})
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEnter})
+
+	if model.modal != modalGroupName {
+		t.Fatalf("modal after empty group name = %v, want group name dialog", model.modal)
+	}
+	if !strings.Contains(model.View(), "Group name is required") {
+		t.Fatalf("validation message missing:\n%s", model.View())
+	}
+}
+
+func TestReconcileIssuesKeepPreviewOpen(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	groupsDir := filepath.Join(root, "groups")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+	store := group.New(groupsDir)
+	if _, err := store.Create("coding"); err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	if _, err := store.Add("coding", "missing"); err != nil {
+		t.Fatalf("add missing skill: %v", err)
+	}
+
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: filepath.Join(root, "disabled"),
+		Groups:   groupsDir,
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'g'}})
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyDown})
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEsc})
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'u'}})
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEnter})
+
+	if model.modal != modalReconcile {
+		t.Fatalf("modal after blocked reconcile = %v, want reconcile preview", model.modal)
+	}
+	if !strings.Contains(model.View(), "Cannot apply") {
+		t.Fatalf("blocked reconcile message missing:\n%s", model.View())
+	}
+}
+
 func createSkill(t *testing.T, parent, id, name, description string) {
 	t.Helper()
 	dir := filepath.Join(parent, id)

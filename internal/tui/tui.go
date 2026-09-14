@@ -311,18 +311,20 @@ func (m *Model) updateModal(message bubbletea.KeyMsg) bubbletea.Cmd {
 	if m.modal == modalReconcile {
 		if key == "esc" {
 			m.modal = modalNone
+			m.message = ""
 			return nil
 		}
 		if key == "enter" {
 			if m.plan.HasIssues() {
 				m.message = "Cannot apply: resolve missing skills or catalog issues first"
-				m.modal = modalNone
 				return nil
 			}
 			if err := transaction.Apply(m.paths, m.plan); err != nil {
 				m.message = err.Error()
+				return nil
 			} else if err := m.refresh(); err != nil {
 				m.message = err.Error()
+				return nil
 			} else {
 				m.message = fmt.Sprintf("Applied group %s", m.plan.Group)
 			}
@@ -335,17 +337,19 @@ func (m *Model) updateModal(message bubbletea.KeyMsg) bubbletea.Cmd {
 		switch message.Type {
 		case bubbletea.KeyEsc:
 			m.modal = modalNone
+			m.message = ""
 		case bubbletea.KeyEnter:
 			name := strings.TrimSpace(m.input)
 			if name == "" {
 				m.message = "Group name is required"
-				m.modal = modalNone
 				return nil
 			}
 			if _, err := group.New(m.paths.Groups).Create(name); err != nil {
 				m.message = err.Error()
+				return nil
 			} else if err := m.refresh(); err != nil {
 				m.message = err.Error()
+				return nil
 			} else {
 				m.selectedGroup = name
 				m.message = fmt.Sprintf("Created group %s; select skills", name)
@@ -365,6 +369,7 @@ func (m *Model) updateModal(message bubbletea.KeyMsg) bubbletea.Cmd {
 
 	if key == "esc" || key == "n" {
 		m.modal = modalNone
+		m.message = ""
 		return nil
 	}
 	if key == "enter" || strings.EqualFold(key, "y") {
