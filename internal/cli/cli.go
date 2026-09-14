@@ -8,6 +8,7 @@ import (
 
 	"github.com/Kklyee/skiller/internal/cli/command"
 	"github.com/Kklyee/skiller/internal/paths"
+	"github.com/Kklyee/skiller/internal/version"
 	"github.com/spf13/cobra"
 )
 
@@ -19,6 +20,7 @@ func NewRootCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "skiller",
 		Short:         "AI Skill Visibility Manager",
+		Version:       version.Version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -51,6 +53,7 @@ func NewRootCommand() *cobra.Command {
 		command.NewProfile(),
 		command.NewSync(),
 		command.NewRun(),
+		command.NewVersion(),
 		command.NewTUI(),
 	)
 

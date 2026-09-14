@@ -30,3 +30,18 @@ func TestRootCommandRejectsUnfinishedJournal(t *testing.T) {
 		t.Fatalf("unexpected journal error: %v", err)
 	}
 }
+
+func TestRootVersionFlag(t *testing.T) {
+	var output bytes.Buffer
+	command := NewRootCommand()
+	command.SetArgs([]string{"--version"})
+	command.SetOut(&output)
+	command.SetErr(&output)
+
+	if err := command.Execute(); err != nil {
+		t.Fatalf("execute version flag: %v", err)
+	}
+	if !strings.Contains(output.String(), "skiller version dev") {
+		t.Fatalf("version output: %q", output.String())
+	}
+}
