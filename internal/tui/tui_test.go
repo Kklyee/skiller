@@ -460,6 +460,87 @@ func TestSkillsFocusATogglesAllVisibleSkills(t *testing.T) {
 	}
 }
 
+func TestAllVirtualGroupCanBeUsedAndMarked(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	groupsDir := filepath.Join(root, "groups")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+	createSkill(t, disabledDir, "beta", "Beta", "Second skill")
+	store := group.New(groupsDir)
+	if _, err := store.Create("hello"); err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	if _, err := store.Add("hello", "alpha"); err != nil {
+		t.Fatalf("add group skill: %v", err)
+	}
+
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: disabledDir,
+		Groups:   groupsDir,
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(keyText("u"))
+	if model.modal != modalReconcile || model.plan.Group != "All" {
+		t.Fatalf("using All did not open an All reconcile plan: modal=%v plan=%+v", model.modal, model.plan)
+	}
+	model.Update(keyCode(bubbletea.KeyEnter))
+
+	skills, err := scanForTest(activeDir, disabledDir)
+	if err != nil {
+		t.Fatalf("scan after using All: %v", err)
+	}
+	for _, skill := range skills {
+		if skill.State != catalog.StateActive {
+			t.Fatalf("after using All, %s state = %s, want active", skill.ID, skill.State)
+		}
+	}
+	view := ansi.Strip(model.viewGroupPanel())
+	if !strings.Contains(view, "● All") {
+		t.Fatalf("All group marker missing after using All:\n%s", view)
+	}
+}
+
+func TestGroupPanelExplainsUnmatchedActiveSkills(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	groupsDir := filepath.Join(root, "groups")
+	createSkill(t, activeDir, "outside", "Outside", "Not in hello")
+	createSkill(t, disabledDir, "inside", "Inside", "In hello")
+	store := group.New(groupsDir)
+	if _, err := store.Create("hello"); err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	if _, err := store.Add("hello", "inside"); err != nil {
+		t.Fatalf("add group skill: %v", err)
+	}
+
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: disabledDir,
+		Groups:   groupsDir,
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(keyCode(bubbletea.KeyDown))
+	view := ansi.Strip(model.viewGroupPanel())
+	if !strings.Contains(view, "›   hello") {
+		t.Fatalf("selected hello group missing:\n%s", view)
+	}
+	if !strings.Contains(view, "No group applied") {
+		t.Fatalf("unmatched active skills are not explained:\n%s", view)
+	}
+}
+
 func TestGroupFocusEnterOpensGroupsPage(t *testing.T) {
 	root := t.TempDir()
 	groupsDir := filepath.Join(root, "groups")

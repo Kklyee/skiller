@@ -108,6 +108,7 @@ type startupTickMsg struct{}
 
 const startupFrameCount = 4
 const startupFrameInterval = 160 * time.Millisecond
+const allGroupName = "All"
 
 func NewModel(pathSet paths.Set) (Model, error) {
 	model := Model{
@@ -748,7 +749,12 @@ func (m *Model) toggleAllSkills() {
 
 func (m *Model) openReconcile() {
 	if m.selectedGroup == "" {
-		m.setMessage(messageInfo, "Select a group before pressing u")
+		selected := group.Group{Name: allGroupName, Skills: make([]string, 0, len(m.skills))}
+		for _, skill := range m.skills {
+			selected.Skills = append(selected.Skills, skill.ID)
+		}
+		m.plan = reconcile.Build(selected, m.skills)
+		m.modal = modalReconcile
 		return
 	}
 	for _, group := range m.groups {
@@ -971,7 +977,11 @@ func headerMetric(label string, value int, color string) string {
 }
 
 func (m *Model) viewGroupPanel() string {
-	lines := []string{"All  " + fmt.Sprintf("%d", len(m.skills))}
+	allMarker := "  "
+	if allSkillsActive(m.skills) {
+		allMarker = stateStyle(catalog.StateActive).Render("●") + " "
+	}
+	lines := []string{allMarker + "All  " + fmt.Sprintf("%d", len(m.skills))}
 	for _, group := range m.groups {
 		marker := "  "
 		if group.Name == m.activeGroup {
@@ -995,7 +1005,30 @@ func (m *Model) viewGroupPanel() string {
 		}
 		lines[index] = prefix + lines[index]
 	}
+	lines = append(lines, "", m.groupStatusLine())
 	return strings.Join(lines, "\n")
+}
+
+func (m *Model) groupStatusLine() string {
+	if allSkillsActive(m.skills) {
+		return stateStyle(catalog.StateActive).Render("● Using All")
+	}
+	if m.activeGroup != "" {
+		return stateStyle(catalog.StateActive).Render("● Using " + m.activeGroup)
+	}
+	return helpTextStyle().Render("○ No group applied")
+}
+
+func allSkillsActive(skills []catalog.Skill) bool {
+	if len(skills) == 0 {
+		return false
+	}
+	for _, skill := range skills {
+		if skill.State != catalog.StateActive {
+			return false
+		}
+	}
+	return true
 }
 
 func findActiveGroup(groups []group.Group, skills []catalog.Skill) string {
