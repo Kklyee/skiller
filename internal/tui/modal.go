@@ -16,10 +16,52 @@ const (
 	modalReconcile
 	modalDeleteGroup
 	modalGroupName
+	modalBatch
+	modalBatchGroup
+)
+
+type batchAction uint8
+
+const (
+	batchActionNone batchAction = iota
+	batchActionAddGroup
+	batchActionRemoveGroup
 )
 
 func (m *Model) updateModal(message bubbletea.KeyPressMsg) bubbletea.Cmd {
 	key := message.String()
+	if m.modal == modalBatch {
+		switch key {
+		case "esc":
+			m.modal = modalNone
+			m.clearMessage()
+		case "e":
+			m.applyBatchVisibility(true)
+		case "d":
+			m.applyBatchVisibility(false)
+		case "a":
+			m.openBatchGroup(batchActionAddGroup)
+		case "r":
+			m.openBatchGroup(batchActionRemoveGroup)
+		}
+		return nil
+	}
+
+	if m.modal == modalBatchGroup {
+		switch key {
+		case "esc":
+			m.modal = modalBatch
+			m.batchAction = batchActionNone
+		case "up", "k":
+			m.moveBatchGroup(-1)
+		case "down", "j":
+			m.moveBatchGroup(1)
+		case "enter":
+			m.applyBatchGroup()
+		}
+		return nil
+	}
+
 	if m.modal == modalReconcile {
 		if key == "esc" {
 			m.modal = modalNone
@@ -95,6 +137,56 @@ func (m *Model) updateModal(message bubbletea.KeyPressMsg) bubbletea.Cmd {
 		m.modal = modalNone
 	}
 	return nil
+}
+
+func (m *Model) viewBatchModal() string {
+	lines := []string{selectionStyle().Render(fmt.Sprintf("Selected %d skills", m.selectedSkillCount())), ""}
+	for _, id := range m.selectedSkillIDs() {
+		lines = append(lines, "  "+id)
+	}
+	lines = append(lines,
+		"",
+		helpTextStyle().Render("e  enable   d  disable"),
+		helpTextStyle().Render("a  add to group   r  remove from group"),
+	)
+	if m.message != "" {
+		lines = append(lines, "", m.renderedMessage())
+	}
+	return strings.Join([]string{
+		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Batch Actions"),
+		m.panel("Marked Skills", strings.Join(lines, "\n"), m.width, m.height-3, true),
+		renderKeyHints(
+			keyHint{key: "e", description: "enable"},
+			keyHint{key: "d", description: "disable"},
+			keyHint{key: "a", description: "add group"},
+			keyHint{key: "r", description: "remove group"},
+			keyHint{key: "esc", description: "cancel"},
+		),
+	}, "\n")
+}
+
+func (m *Model) viewBatchGroupModal() string {
+	action := "Add to group"
+	if m.batchAction == batchActionRemoveGroup {
+		action = "Remove from group"
+	}
+	lines := []string{helpTextStyle().Render(action), ""}
+	for index, group := range m.groups {
+		prefix := "  "
+		if index == m.batchGroupIndex {
+			prefix = selectedRowStyle().Render("›") + " "
+		}
+		lines = append(lines, prefix+groupNameStyle().Render(group.Name))
+	}
+	return strings.Join([]string{
+		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Batch Group"),
+		m.panel("Select Group", strings.Join(lines, "\n"), m.width, m.height-3, true),
+		renderKeyHints(
+			keyHint{key: "↑↓/jk", description: "move"},
+			keyHint{key: "enter", description: "apply"},
+			keyHint{key: "esc", description: "back"},
+		),
+	}, "\n")
 }
 
 func (m *Model) viewGroupNameModal() string {

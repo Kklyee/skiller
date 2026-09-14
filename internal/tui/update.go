@@ -108,6 +108,19 @@ func (m *Model) updateKey(message bubbletea.KeyPressMsg) bubbletea.Cmd {
 		if m.focus == FocusSkills {
 			m.toggleAllSkills()
 		}
+	case "x":
+		if m.focus == FocusSkills {
+			m.toggleSelectedMark()
+		}
+	case "b":
+		if m.focus == FocusSkills {
+			m.openBatchActions()
+		}
+	case "c":
+		if m.focus == FocusSkills {
+			m.clearSelectedSkills()
+			m.clearMessage()
+		}
 	case "/":
 		m.searchActive = true
 		m.search = ""
@@ -184,6 +197,7 @@ func (m *Model) updateGroups(message bubbletea.KeyPressMsg, key string) bubblete
 
 func (m *Model) openGroups() {
 	m.screen = ScreenGroups
+	m.clearSelectedSkills()
 	m.normalizeGroupSelection()
 	m.detailExpanded = false
 	m.clearMessage()

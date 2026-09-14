@@ -53,6 +53,7 @@ type Model struct {
 
 	selectedGroup  string
 	selectedSkill  string
+	selectedSkills map[string]bool
 	activeGroup    string
 	detailExpanded bool
 
@@ -78,6 +79,9 @@ type Model struct {
 	startupPending bool
 	startupActive  bool
 	startupFrame   int
+
+	batchAction     batchAction
+	batchGroupIndex int
 }
 
 const allGroupName = "All"
@@ -123,6 +127,7 @@ func (m *Model) refresh() error {
 	m.summary.DisabledDir = m.paths.Disabled
 	m.selectedGroup = previousGroup
 	m.selectedSkill = previousSkill
+	m.normalizeSkillSelection()
 	m.normalizeGroupSelection()
 	m.normalizeSelection()
 
@@ -161,8 +166,12 @@ func (m *Model) moveSelection(delta int) {
 }
 
 func (m *Model) moveGroup(delta int) {
+	previous := m.selectedGroup
 	if len(m.groups) == 0 {
 		m.selectedGroup = ""
+		if previous != m.selectedGroup {
+			m.clearSelectedSkills()
+		}
 		return
 	}
 	index := -1
@@ -195,9 +204,15 @@ func (m *Model) moveGroup(delta int) {
 	}
 	if index == -1 {
 		m.selectedGroup = ""
+		if previous != m.selectedGroup {
+			m.clearSelectedSkills()
+		}
 		return
 	}
 	m.selectedGroup = m.groups[index].Name
+	if previous != m.selectedGroup {
+		m.clearSelectedSkills()
+	}
 	m.normalizeSelection()
 }
 
@@ -288,6 +303,169 @@ func (m *Model) selectedSkillValue() (catalog.Skill, bool) {
 
 func (m *Model) isPinned(id string) bool {
 	return slices.Contains(m.pins, id)
+}
+
+func (m *Model) selectedSkillCount() int {
+	return len(m.selectedSkills)
+}
+
+func (m *Model) toggleSelectedMark() {
+	if _, ok := m.selectedSkillValue(); !ok {
+		return
+	}
+	if m.selectedSkills == nil {
+		m.selectedSkills = make(map[string]bool)
+	}
+	m.selectedSkills[m.selectedSkill] = !m.selectedSkills[m.selectedSkill]
+	if !m.selectedSkills[m.selectedSkill] {
+		delete(m.selectedSkills, m.selectedSkill)
+	}
+}
+
+func (m *Model) clearSelectedSkills() {
+	m.selectedSkills = nil
+}
+
+func (m *Model) normalizeSkillSelection() {
+	if len(m.selectedSkills) == 0 {
+		return
+	}
+	known := make(map[string]struct{}, len(m.skills))
+	for _, skill := range m.skills {
+		known[skill.ID] = struct{}{}
+	}
+	for id := range m.selectedSkills {
+		if _, ok := known[id]; !ok {
+			delete(m.selectedSkills, id)
+		}
+	}
+}
+
+func (m *Model) selectedSkillIDs() []string {
+	ids := make([]string, 0, len(m.selectedSkills))
+	for id, selected := range m.selectedSkills {
+		if selected {
+			ids = append(ids, id)
+		}
+	}
+	slices.Sort(ids)
+	return ids
+}
+
+func (m *Model) openBatchActions() {
+	if m.selectedSkillCount() == 0 {
+		m.setMessage(messageInfo, "Mark skills before opening batch actions")
+		return
+	}
+	m.batchAction = batchActionNone
+	m.batchGroupIndex = 0
+	m.modal = modalBatch
+}
+
+func (m *Model) applyBatchVisibility(enable bool) {
+	ids := m.selectedSkillIDs()
+	if len(ids) == 0 {
+		m.modal = modalNone
+		return
+	}
+	selected := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		selected[id] = struct{}{}
+	}
+	desired := make([]string, 0, len(m.skills))
+	for _, skill := range m.skills {
+		wantActive := skill.State == catalog.StateActive
+		if _, ok := selected[skill.ID]; ok {
+			wantActive = enable
+		}
+		if wantActive {
+			desired = append(desired, skill.ID)
+		}
+	}
+
+	plan := reconcile.BuildWithPins(group.Group{Name: "selection", Skills: desired}, m.skills, m.pins)
+	if plan.HasIssues() {
+		m.setMessage(messageError, "Cannot apply batch action: resolve catalog or pin issues first")
+		return
+	}
+	if err := transaction.Apply(m.paths, plan); err != nil {
+		m.setError(err)
+		return
+	}
+	if err := m.refresh(); err != nil {
+		m.setError(err)
+		return
+	}
+	m.modal = modalNone
+	m.clearSelectedSkills()
+	action := "Disabled"
+	if enable {
+		action = "Enabled"
+	}
+	m.setMessage(messageSuccess, fmt.Sprintf("%s %d selected skills", action, len(ids)))
+}
+
+func (m *Model) openBatchGroup(action batchAction) {
+	if len(m.groups) == 0 {
+		m.setMessage(messageInfo, "Create a group before assigning skills")
+		return
+	}
+	m.batchAction = action
+	m.batchGroupIndex = 0
+	for index, candidate := range m.groups {
+		if candidate.Name == m.selectedGroup {
+			m.batchGroupIndex = index
+			break
+		}
+	}
+	m.modal = modalBatchGroup
+}
+
+func (m *Model) moveBatchGroup(delta int) {
+	if len(m.groups) == 0 {
+		return
+	}
+	m.batchGroupIndex += delta
+	if m.batchGroupIndex < 0 {
+		m.batchGroupIndex = 0
+	}
+	if m.batchGroupIndex >= len(m.groups) {
+		m.batchGroupIndex = len(m.groups) - 1
+	}
+}
+
+func (m *Model) applyBatchGroup() {
+	ids := m.selectedSkillIDs()
+	if len(ids) == 0 || m.batchGroupIndex < 0 || m.batchGroupIndex >= len(m.groups) {
+		m.modal = modalNone
+		return
+	}
+	selectedGroup := m.groups[m.batchGroupIndex]
+	store := group.New(m.paths.Groups)
+	count := 0
+	var err error
+	if m.batchAction == batchActionAddGroup {
+		count, err = store.Add(selectedGroup.Name, ids...)
+	} else {
+		count, err = store.Remove(selectedGroup.Name, ids...)
+	}
+	if err != nil {
+		m.setError(err)
+		return
+	}
+	if err := m.refresh(); err != nil {
+		m.setError(err)
+		return
+	}
+	m.modal = modalNone
+	m.clearSelectedSkills()
+	action := "Removed"
+	preposition := "from"
+	if m.batchAction == batchActionAddGroup {
+		action = "Added"
+		preposition = "to"
+	}
+	m.setMessage(messageSuccess, fmt.Sprintf("%s %d skills %s %s", action, count, preposition, selectedGroup.Name))
 }
 
 func (m *Model) toggleSelectedSkill() {

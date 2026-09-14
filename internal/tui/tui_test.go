@@ -1012,6 +1012,141 @@ func TestTUIShowsPinnedSkillsAndKeepsThemActive(t *testing.T) {
 	}
 }
 
+func TestMultiSelectBatchVisibilityUsesTransaction(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+	createSkill(t, disabledDir, "beta", "Beta", "Second skill")
+	createSkill(t, disabledDir, "gamma", "Gamma", "Third skill")
+
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: disabledDir,
+		Groups:   filepath.Join(root, "groups"),
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(keyCode(bubbletea.KeyTab))
+	model.Update(keyCode(bubbletea.KeyDown))
+	model.Update(keyText("x"))
+	if !strings.Contains(viewText(&model), "1 selected") {
+		t.Fatalf("selection count missing:\n%s", viewText(&model))
+	}
+	model.Update(keyCode(bubbletea.KeyDown))
+	model.Update(keyText("x"))
+	model.Update(keyText("b"))
+	if model.modal != modalBatch {
+		t.Fatalf("batch modal = %v, want batch modal", model.modal)
+	}
+	model.Update(keyText("e"))
+
+	for _, id := range []string{"beta", "gamma"} {
+		if _, err := os.Stat(filepath.Join(activeDir, id, "SKILL.md")); err != nil {
+			t.Fatalf("batch did not enable %s: %v", id, err)
+		}
+	}
+	if len(model.selectedSkills) != 0 {
+		t.Fatalf("selection after batch = %v, want empty", model.selectedSkills)
+	}
+}
+
+func TestMultiSelectBatchDisableKeepsPinnedSkillsActive(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	pinsPath := filepath.Join(root, "pins.toml")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+	createSkill(t, activeDir, "beta", "Beta", "Second skill")
+	if _, err := pin.New(pinsPath).Add("beta"); err != nil {
+		t.Fatalf("pin beta: %v", err)
+	}
+
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: filepath.Join(root, "disabled"),
+		Pins:     pinsPath,
+		Groups:   filepath.Join(root, "groups"),
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(keyCode(bubbletea.KeyTab))
+	model.Update(keyText("x"))
+	model.Update(keyCode(bubbletea.KeyDown))
+	model.Update(keyText("x"))
+	model.Update(keyText("b"))
+	model.Update(keyText("d"))
+
+	if _, err := os.Stat(filepath.Join(activeDir, "beta", "SKILL.md")); err != nil {
+		t.Fatalf("pinned skill was disabled by batch action: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(activeDir), "disabled", "alpha", "SKILL.md")); err != nil {
+		t.Fatalf("unpinned skill was not disabled: %v", err)
+	}
+}
+
+func TestMultiSelectBatchGroupAddAndRemove(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	groupsDir := filepath.Join(root, "groups")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+	createSkill(t, activeDir, "beta", "Beta", "Second skill")
+	store := group.New(groupsDir)
+	if _, err := store.Create("coding"); err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: disabledDir,
+		Groups:   groupsDir,
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(keyCode(bubbletea.KeyTab))
+	model.Update(keyText("x"))
+	model.Update(keyCode(bubbletea.KeyDown))
+	model.Update(keyText("x"))
+	model.Update(keyText("b"))
+	model.Update(keyText("a"))
+	if model.modal != modalBatchGroup {
+		t.Fatalf("group batch modal = %v, want group batch modal", model.modal)
+	}
+	model.Update(keyCode(bubbletea.KeyEnter))
+
+	created, err := store.Get("coding")
+	if err != nil {
+		t.Fatalf("read group after add: %v", err)
+	}
+	if want := []string{"alpha", "beta"}; !slices.Equal(created.Skills, want) {
+		t.Fatalf("group skills after add = %v, want %v", created.Skills, want)
+	}
+
+	model.Update(keyCode(bubbletea.KeyUp))
+	model.Update(keyText("x"))
+	model.Update(keyCode(bubbletea.KeyDown))
+	model.Update(keyText("x"))
+	model.Update(keyText("b"))
+	model.Update(keyText("r"))
+	model.Update(keyCode(bubbletea.KeyEnter))
+	created, err = store.Get("coding")
+	if err != nil {
+		t.Fatalf("read group after remove: %v", err)
+	}
+	if len(created.Skills) != 0 {
+		t.Fatalf("group skills after remove = %v, want empty", created.Skills)
+	}
+}
+
 func TestSkillStateBadgesUseSemanticColors(t *testing.T) {
 	want := map[catalog.State]color.Color{
 		catalog.StateActive:   lipgloss.Color("10"),

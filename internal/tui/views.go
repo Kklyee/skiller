@@ -32,6 +32,12 @@ func (m *Model) viewContent() string {
 	if m.modal == modalDeleteGroup {
 		return m.viewDeleteGroupModal()
 	}
+	if m.modal == modalBatch {
+		return m.viewBatchModal()
+	}
+	if m.modal == modalBatchGroup {
+		return m.viewBatchGroupModal()
+	}
 
 	switch m.screen {
 	case ScreenGroups:
@@ -57,6 +63,10 @@ func (m *Model) viewMain() string {
 	}
 
 	groupWidth, skillsWidth, detailsWidth := mainColumnWidths(m.width)
+	skillsTitle := "Skills"
+	if selected := m.selectedSkillCount(); selected > 0 {
+		skillsTitle = fmt.Sprintf("Skills [%d selected]", selected)
+	}
 	showDetails := detailsWidth >= 24 && m.width >= 90
 	if showDetails {
 		return strings.Join([]string{
@@ -64,7 +74,7 @@ func (m *Model) viewMain() string {
 			header,
 			m.mainColumns([]mainColumn{
 				{title: "Groups", content: m.viewGroupPanel(), width: groupWidth, focused: m.focus == FocusGroups},
-				{title: "Skills", content: m.viewSkillsPanel(), width: skillsWidth, focused: m.focus == FocusSkills},
+				{title: skillsTitle, content: m.viewSkillsPanel(), width: skillsWidth, focused: m.focus == FocusSkills},
 				{title: "Details", content: m.viewDetailsPanel(), width: detailsWidth},
 			}, bodyHeight),
 			m.viewFooter(),
@@ -85,7 +95,7 @@ func (m *Model) viewMain() string {
 		header,
 		m.mainColumns([]mainColumn{
 			{title: "Groups", content: m.viewGroupPanel(), width: groupWidth, focused: m.focus == FocusGroups},
-			{title: "Skills", content: m.viewSkillsPanel(), width: usableSkillsWidth, focused: m.focus == FocusSkills},
+			{title: skillsTitle, content: m.viewSkillsPanel(), width: usableSkillsWidth, focused: m.focus == FocusSkills},
 		}, bodyHeight),
 		m.viewFooter(),
 	}, "\n")
@@ -184,7 +194,7 @@ func (m *Model) viewSkillsPanel() string {
 	}
 	start, end := viewportBounds(len(visible), selected, contentHeight)
 	for _, skill := range visible[start:end] {
-		lines = append(lines, skillRowWithPin(skill, skill.ID == m.selectedSkill, m.isPinned(skill.ID)))
+		lines = append(lines, skillRowWithSelection(skill, skill.ID == m.selectedSkill, m.isPinned(skill.ID), m.selectedSkills[skill.ID]))
 	}
 	return strings.Join(lines, "\n")
 }
@@ -250,6 +260,9 @@ func (m *Model) viewFooter() string {
 		hints = append(hints,
 			keyHint{key: "space", description: "toggle"},
 			keyHint{key: "a", description: "all"},
+			keyHint{key: "x", description: "mark"},
+			keyHint{key: "b", description: "batch"},
+			keyHint{key: "c", description: "clear"},
 		)
 	}
 	hints = append(hints,
@@ -280,7 +293,11 @@ func (m *Model) viewFooter() string {
 			{key: "esc", description: "collapse"},
 		}
 	}
-	lines := []string{renderKeyHints(hints...)}
+	lines := make([]string, 0, 2)
+	if m.selectedSkillCount() > 0 {
+		lines = append(lines, selectionStyle().Render(fmt.Sprintf("%d selected", m.selectedSkillCount())))
+	}
+	lines = append(lines, renderKeyHints(hints...))
 	if m.message != "" {
 		lines = append(lines, messageStyle(m.messageLevel).Render(m.message))
 	}
@@ -495,6 +512,9 @@ func (m *Model) viewHelp() string {
 		helpLine("tab", "switch panel focus"),
 		helpLine("space", "toggle selected skill"),
 		helpLine("a", "toggle all visible skills"),
+		helpLine("x", "mark or unmark a skill"),
+		helpLine("b", "batch actions for marked skills"),
+		helpLine("c", "clear marked skills"),
 		helpLine("/", "search by ID, metadata, or group"),
 		helpLine("g", "group management"),
 		helpLine("u", "preview and apply selected group"),
@@ -531,6 +551,10 @@ func skillRow(skill catalog.Skill, selected bool) string {
 }
 
 func skillRowWithPin(skill catalog.Skill, selected, pinned bool) string {
+	return skillRowWithSelection(skill, selected, pinned, false)
+}
+
+func skillRowWithSelection(skill catalog.Skill, selected, pinned, marked bool) string {
 	name := displayName(skill)
 	if name != skill.ID {
 		name = fmt.Sprintf("%s [%s]", name, skill.ID)
@@ -541,6 +565,9 @@ func skillRowWithPin(skill catalog.Skill, selected, pinned bool) string {
 	row := fmt.Sprintf("%s %s", stateStyle(skill.State).Render(stateIcon(skill.State)), name)
 	if pinned {
 		row = pinStyle().Render("◆") + " " + row
+	}
+	if marked {
+		row = selectionStyle().Render("✓") + " " + row
 	}
 	return row
 }

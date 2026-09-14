@@ -131,6 +131,9 @@ skiller run opencode
 Tab         切换 Groups / Skills 焦点
 Space       切换当前 Skill（仅 Skills 焦点）
 a           激活全部可见 Skill，再按一次则禁用非 pinned Skill
+x           标记或取消标记当前 Skill
+b           打开标记 Skill 的批量操作
+c           清空标记
 /           搜索
 Enter       Groups 进入分组页，Skills 查看详情
 g           打开分组管理
@@ -141,7 +144,7 @@ q           退出
 ```
 
 Details 面板只展示当前 Skill 的 name、description、status、groups 和 pinned
-状态，不参与焦点切换。
+状态，不参与焦点切换。批量操作支持启用、禁用以及加入或移出分组。
 
 ## 状态说明
 
