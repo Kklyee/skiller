@@ -291,6 +291,40 @@ func TestCreatingGroupOpensSkillSelector(t *testing.T) {
 	}
 }
 
+func TestGroupEditorSelectsAllSkillsWithA(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	groupsDir := filepath.Join(root, "groups")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+	createSkill(t, disabledDir, "beta", "Beta", "Second skill")
+
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: disabledDir,
+		Groups:   groupsDir,
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'g'}})
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'n'}})
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune("coding")})
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEnter})
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'a'}})
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEnter})
+
+	created, err := group.New(groupsDir).Get("coding")
+	if err != nil {
+		t.Fatalf("read created group: %v", err)
+	}
+	if want := []string{"alpha", "beta"}; !slices.Equal(created.Skills, want) {
+		t.Fatalf("select all group skills = %v, want %v", created.Skills, want)
+	}
+}
+
 func TestMainLayoutUsesSingleTableHeader(t *testing.T) {
 	root := t.TempDir()
 	activeDir := filepath.Join(root, "active")
