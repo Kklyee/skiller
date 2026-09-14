@@ -424,6 +424,20 @@ func TestTUIShowsContextualKeyboardHints(t *testing.T) {
 	}
 }
 
+func TestMessageStylesUseSemanticColors(t *testing.T) {
+	want := map[messageKind]lipgloss.Color{
+		messageInfo:    lipgloss.Color("11"),
+		messageSuccess: lipgloss.Color("10"),
+		messageError:   lipgloss.Color("9"),
+	}
+
+	for kind, color := range want {
+		if got := messageStyle(kind).GetForeground(); got != color {
+			t.Fatalf("message %v color = %v, want %v", kind, got, color)
+		}
+	}
+}
+
 func createSkill(t *testing.T, parent, id, name, description string) {
 	t.Helper()
 	dir := filepath.Join(parent, id)

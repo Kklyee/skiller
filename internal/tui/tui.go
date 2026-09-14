@@ -43,6 +43,14 @@ const (
 	modalGroupName
 )
 
+type messageKind uint8
+
+const (
+	messageInfo messageKind = iota + 1
+	messageSuccess
+	messageError
+)
+
 type Model struct {
 	paths paths.Set
 
@@ -72,6 +80,7 @@ type Model struct {
 
 	doctorReport doctor.Report
 	message      string
+	messageLevel messageKind
 	width        int
 	height       int
 }
@@ -196,7 +205,7 @@ func (m *Model) updateKey(message bubbletea.KeyMsg) bubbletea.Cmd {
 	case ScreenGroupDetails, ScreenDoctor, ScreenHelp:
 		if key == "esc" || key == "q" {
 			m.screen = ScreenMain
-			m.message = ""
+			m.clearMessage()
 		}
 		return nil
 	}
@@ -227,7 +236,7 @@ func (m *Model) updateKey(message bubbletea.KeyMsg) bubbletea.Cmd {
 		m.focus = FocusSkills
 	case "g":
 		m.screen = ScreenGroups
-		m.message = ""
+		m.clearMessage()
 	case "u":
 		m.openReconcile()
 	case "d":
@@ -235,7 +244,7 @@ func (m *Model) updateKey(message bubbletea.KeyMsg) bubbletea.Cmd {
 		m.screen = ScreenDoctor
 	case "?":
 		m.screen = ScreenHelp
-		m.message = ""
+		m.clearMessage()
 	}
 
 	return nil
@@ -266,7 +275,7 @@ func (m *Model) updateGroups(message bubbletea.KeyMsg, key string) bubbletea.Cmd
 		return bubbletea.Quit
 	case "esc":
 		m.screen = ScreenMain
-		m.message = ""
+		m.clearMessage()
 	case "up", "k":
 		m.moveGroup(-1)
 	case "down", "j":
@@ -291,7 +300,7 @@ func (m *Model) updateEditor(message bubbletea.KeyMsg) bubbletea.Cmd {
 	switch key {
 	case "esc":
 		m.screen = ScreenGroups
-		m.message = ""
+		m.clearMessage()
 	case "up", "k":
 		if m.editorIndex > 0 {
 			m.editorIndex--
@@ -316,22 +325,22 @@ func (m *Model) updateModal(message bubbletea.KeyMsg) bubbletea.Cmd {
 	if m.modal == modalReconcile {
 		if key == "esc" {
 			m.modal = modalNone
-			m.message = ""
+			m.clearMessage()
 			return nil
 		}
 		if key == "enter" {
 			if m.plan.HasIssues() {
-				m.message = "Cannot apply: resolve missing skills or catalog issues first"
+				m.setMessage(messageInfo, "Cannot apply: resolve missing skills or catalog issues first")
 				return nil
 			}
 			if err := transaction.Apply(m.paths, m.plan); err != nil {
-				m.message = err.Error()
+				m.setError(err)
 				return nil
 			} else if err := m.refresh(); err != nil {
-				m.message = err.Error()
+				m.setError(err)
 				return nil
 			} else {
-				m.message = fmt.Sprintf("Applied group %s", m.plan.Group)
+				m.setMessage(messageSuccess, fmt.Sprintf("Applied group %s", m.plan.Group))
 			}
 			m.modal = modalNone
 		}
@@ -342,22 +351,22 @@ func (m *Model) updateModal(message bubbletea.KeyMsg) bubbletea.Cmd {
 		switch message.Type {
 		case bubbletea.KeyEsc:
 			m.modal = modalNone
-			m.message = ""
+			m.clearMessage()
 		case bubbletea.KeyEnter:
 			name := strings.TrimSpace(m.input)
 			if name == "" {
-				m.message = "Group name is required"
+				m.setMessage(messageInfo, "Group name is required")
 				return nil
 			}
 			if _, err := group.New(m.paths.Groups).Create(name); err != nil {
-				m.message = err.Error()
+				m.setError(err)
 				return nil
 			} else if err := m.refresh(); err != nil {
-				m.message = err.Error()
+				m.setError(err)
 				return nil
 			} else {
 				m.selectedGroup = name
-				m.message = fmt.Sprintf("Created group %s; select skills", name)
+				m.setMessage(messageSuccess, fmt.Sprintf("Created group %s; select skills", name))
 				m.openEditor()
 			}
 			m.modal = modalNone
@@ -374,17 +383,17 @@ func (m *Model) updateModal(message bubbletea.KeyMsg) bubbletea.Cmd {
 
 	if key == "esc" || key == "n" {
 		m.modal = modalNone
-		m.message = ""
+		m.clearMessage()
 		return nil
 	}
 	if key == "enter" || strings.EqualFold(key, "y") {
 		if err := group.New(m.paths.Groups).Delete(m.deleteGroup); err != nil {
-			m.message = err.Error()
+			m.setError(err)
 		} else if err := m.refresh(); err != nil {
-			m.message = err.Error()
+			m.setError(err)
 		} else {
 			m.selectedGroup = ""
-			m.message = fmt.Sprintf("Deleted group %s", m.deleteGroup)
+			m.setMessage(messageSuccess, fmt.Sprintf("Deleted group %s", m.deleteGroup))
 		}
 		m.modal = modalNone
 	}
@@ -537,19 +546,19 @@ func (m *Model) toggleSelectedSkill() {
 		err = fmt.Errorf("cannot toggle %s skill %q", skill.State, skill.ID)
 	}
 	if err != nil {
-		m.message = err.Error()
+		m.setError(err)
 		return
 	}
 	if err := m.refresh(); err != nil {
-		m.message = err.Error()
+		m.setError(err)
 		return
 	}
-	m.message = fmt.Sprintf("Toggled %s", skill.ID)
+	m.setMessage(messageSuccess, fmt.Sprintf("Toggled %s", skill.ID))
 }
 
 func (m *Model) openReconcile() {
 	if m.selectedGroup == "" {
-		m.message = "Select a group before pressing u"
+		m.setMessage(messageInfo, "Select a group before pressing u")
 		return
 	}
 	for _, group := range m.groups {
@@ -563,7 +572,7 @@ func (m *Model) openReconcile() {
 
 func (m *Model) openEditor() {
 	if m.selectedGroup == "" {
-		m.message = "Select a group before editing"
+		m.setMessage(messageInfo, "Select a group before editing")
 		return
 	}
 	for _, group := range m.groups {
@@ -606,27 +615,27 @@ func (m *Model) saveEditor() {
 
 	if len(m.editorGroup.Skills) > 0 {
 		if _, err := store.Remove(m.editorGroup.Name, m.editorGroup.Skills...); err != nil {
-			m.message = err.Error()
+			m.setError(err)
 			return
 		}
 	}
 	if len(selected) > 0 {
 		if _, err := store.Add(m.editorGroup.Name, selected...); err != nil {
-			m.message = err.Error()
+			m.setError(err)
 			return
 		}
 	}
 	if err := m.refresh(); err != nil {
-		m.message = err.Error()
+		m.setError(err)
 		return
 	}
 	m.screen = ScreenGroups
-	m.message = fmt.Sprintf("Saved group %s", m.editorGroup.Name)
+	m.setMessage(messageSuccess, fmt.Sprintf("Saved group %s", m.editorGroup.Name))
 }
 
 func (m *Model) openDeleteGroup() {
 	if m.selectedGroup == "" {
-		m.message = "Select a group before deleting"
+		m.setMessage(messageInfo, "Select a group before deleting")
 		return
 	}
 	m.deleteGroup = m.selectedGroup
@@ -792,6 +801,38 @@ func (m *Model) viewDetailsPanel() string {
 	return strings.Join(lines, "\n")
 }
 
+func (m *Model) setMessage(kind messageKind, message string) {
+	m.message = message
+	m.messageLevel = kind
+}
+
+func (m *Model) setError(err error) {
+	m.setMessage(messageError, err.Error())
+}
+
+func (m *Model) clearMessage() {
+	m.message = ""
+	m.messageLevel = 0
+}
+
+func (m *Model) renderedMessage() string {
+	if m.message == "" {
+		return ""
+	}
+	return messageStyle(m.messageLevel).Render(m.message)
+}
+
+func messageStyle(kind messageKind) lipgloss.Style {
+	color := lipgloss.Color("11")
+	switch kind {
+	case messageSuccess:
+		color = lipgloss.Color("10")
+	case messageError:
+		color = lipgloss.Color("9")
+	}
+	return lipgloss.NewStyle().Bold(true).Foreground(color)
+}
+
 func (m *Model) viewFooter() string {
 	hints := []keyHint{
 		{key: "↑↓/jk", description: "move"},
@@ -820,7 +861,7 @@ func (m *Model) viewFooter() string {
 	}
 	lines := []string{renderKeyHints(hints...)}
 	if m.message != "" {
-		lines = append(lines, lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(m.message))
+		lines = append(lines, messageStyle(m.messageLevel).Render(m.message))
 	}
 	return strings.Join(lines, "\n")
 }
@@ -848,7 +889,7 @@ func (m *Model) viewGroups() string {
 		body += "\n\nDelete group " + m.deleteGroup + "? enter/y confirm, esc/n cancel"
 	}
 	if m.message != "" {
-		body += "\n\n" + m.message
+		body += "\n\n" + m.renderedMessage()
 	}
 	footer := renderKeyHints(
 		keyHint{key: "↑↓/jk", description: "move"},
@@ -894,7 +935,7 @@ func (m *Model) viewGroupEditor() string {
 		lines = append(lines, "  No installed skills")
 	}
 	if m.message != "" {
-		lines = append(lines, "", m.message)
+		lines = append(lines, "", m.renderedMessage())
 	}
 	return strings.Join([]string{
 		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Edit Group"),
@@ -959,6 +1000,9 @@ func (m *Model) viewReconcileModal() string {
 	lines = append(lines, "", fmt.Sprintf("%d enable  %d disable  %d unchanged", len(m.plan.Enable), len(m.plan.Disable), len(m.plan.Keep)))
 	if m.plan.HasIssues() {
 		lines = append(lines, "Cannot apply until issues are resolved")
+	}
+	if m.message != "" {
+		lines = append(lines, "", m.renderedMessage())
 	}
 
 	return strings.Join([]string{
