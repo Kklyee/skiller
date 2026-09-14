@@ -1390,16 +1390,41 @@ func (m *Model) viewReconcileModal() string {
 }
 
 func (m *Model) viewDoctor() string {
-	lines := []string{"Doctor"}
+	lines := make([]string, 0, len(m.doctorReport.Checks)+5)
+	section := ""
 	for _, check := range m.doctorReport.Checks {
-		lines = append(lines, fmt.Sprintf("%s %s: %s", check.Level.Symbol(), check.Name, check.Detail))
+		if check.Section != section {
+			if len(lines) > 0 {
+				lines = append(lines, "")
+			}
+			lines = append(lines, doctorSectionStyle().Render(check.Section))
+			section = check.Section
+		}
+		lines = append(lines, "  "+doctorLevelStyle(check.Level).Render(check.Level.Symbol())+" "+check.Name+"  "+helpTextStyle().Render(check.Detail))
 	}
-	lines = append(lines, "", "Status: "+m.doctorReport.Overall.String())
+	lines = append(lines, "", "Status: "+doctorLevelStyle(m.doctorReport.Overall).Render(m.doctorReport.Overall.Symbol()+" "+m.doctorReport.Overall.String()))
 	return strings.Join([]string{
 		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Doctor"),
 		m.panel("Doctor", strings.Join(lines, "\n"), m.width, m.height-3, true),
 		renderKeyHints(keyHint{key: "esc", description: "back"}),
 	}, "\n")
+}
+
+func doctorLevelStyle(level doctor.Level) lipgloss.Style {
+	color := lipgloss.Color("8")
+	switch level {
+	case doctor.Healthy:
+		color = lipgloss.Color("10")
+	case doctor.Warning:
+		color = lipgloss.Color("11")
+	case doctor.Error:
+		color = lipgloss.Color("9")
+	}
+	return lipgloss.NewStyle().Bold(true).Foreground(color)
+}
+
+func doctorSectionStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6"))
 }
 
 func (m *Model) viewHelp() string {

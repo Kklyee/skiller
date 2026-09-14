@@ -11,6 +11,7 @@ import (
 	bubbletea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/Kklyee/skiller/internal/catalog"
+	"github.com/Kklyee/skiller/internal/doctor"
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/paths"
 	"github.com/charmbracelet/x/ansi"
@@ -247,6 +248,45 @@ func TestSearchBarShowsQueryAndMatchCount(t *testing.T) {
 	view := ansi.Strip(model.viewSkillsPanel())
 	if !strings.Contains(view, "/ beta") || !strings.Contains(view, "1 match") {
 		t.Fatalf("active search bar is missing query or count:\n%s", view)
+	}
+}
+
+func TestDoctorViewUsesSemanticHealthSections(t *testing.T) {
+	if got, want := doctorLevelStyle(doctor.Healthy).GetForeground(), lipgloss.Color("10"); got != want {
+		t.Fatalf("healthy color = %v, want %v", got, want)
+	}
+	if got, want := doctorLevelStyle(doctor.Warning).GetForeground(), lipgloss.Color("11"); got != want {
+		t.Fatalf("warning color = %v, want %v", got, want)
+	}
+	if got, want := doctorLevelStyle(doctor.Error).GetForeground(), lipgloss.Color("9"); got != want {
+		t.Fatalf("error color = %v, want %v", got, want)
+	}
+
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	if err := os.MkdirAll(activeDir, 0o755); err != nil {
+		t.Fatalf("create active directory: %v", err)
+	}
+	if err := os.MkdirAll(disabledDir, 0o755); err != nil {
+		t.Fatalf("create disabled directory: %v", err)
+	}
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: disabledDir,
+		Groups:   filepath.Join(root, "groups"),
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(keyText("d"))
+	view := viewText(&model)
+	for _, want := range []string{"Paths", "Filesystem", "Skills", "Transactions", "Status:", "healthy"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("doctor view missing %q:\n%s", want, view)
+		}
 	}
 }
 
