@@ -15,3 +15,7 @@ or define the project's desired skills directly:
 ```toml
 skills = ["code-review", "tdd"]
 ```
+
+Run `skiller sync` to apply the project configuration. To synchronize and
+launch an installed coding agent, use `skiller run codex`, `skiller run
+gemini`, or `skiller run opencode`.

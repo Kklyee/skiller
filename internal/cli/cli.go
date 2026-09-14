@@ -50,6 +50,7 @@ func NewRootCommand() *cobra.Command {
 		command.NewUse(),
 		command.NewProfile(),
 		command.NewSync(),
+		command.NewRun(),
 		command.NewTUI(),
 	)
 
