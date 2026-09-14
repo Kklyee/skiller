@@ -11,6 +11,7 @@ import (
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/paths"
 	"github.com/Kklyee/skiller/internal/reconcile"
+	"github.com/Kklyee/skiller/internal/transaction"
 	"github.com/spf13/cobra"
 )
 
@@ -54,7 +55,7 @@ func NewUse() *cobra.Command {
 				return err
 			}
 
-			if err := reconcile.Apply(pathSet.Active, pathSet.Disabled, plan); err != nil {
+			if err := transaction.Apply(pathSet, plan); err != nil {
 				return err
 			}
 			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Applied group %s\n", plan.Group)

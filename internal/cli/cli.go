@@ -1,7 +1,13 @@
 package cli
 
 import (
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+
 	"github.com/Kklyee/skiller/internal/cli/command"
+	"github.com/Kklyee/skiller/internal/paths"
 	"github.com/spf13/cobra"
 )
 
@@ -15,6 +21,23 @@ func NewRootCommand() *cobra.Command {
 		Short:         "AI Skill Visibility Manager",
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if cmd.Name() == "doctor" {
+				return nil
+			}
+
+			pathSet, err := paths.Default()
+			if err != nil {
+				return err
+			}
+			if _, err := os.Lstat(pathSet.Journal); err == nil {
+				return fmt.Errorf("unfinished transaction journal exists at %s", pathSet.Journal)
+			} else if !errors.Is(err, fs.ErrNotExist) {
+				return fmt.Errorf("inspect transaction journal %q: %w", pathSet.Journal, err)
+			}
+
+			return nil
+		},
 	}
 
 	cmd.AddCommand(

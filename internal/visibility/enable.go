@@ -11,6 +11,12 @@ import (
 )
 
 func Enable(activeDir, disabledDir, id string) (bool, error) {
+	return withLock(disabledDir, func() (bool, error) {
+		return EnableWithoutLock(activeDir, disabledDir, id)
+	})
+}
+
+func EnableWithoutLock(activeDir, disabledDir, id string) (bool, error) {
 	skills, err := catalog.Scan(activeDir, disabledDir)
 	if err != nil {
 		return false, fmt.Errorf("inspect installed skills: %w", err)

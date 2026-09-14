@@ -8,9 +8,17 @@ import (
 	"path/filepath"
 
 	"github.com/Kklyee/skiller/internal/catalog"
+	"github.com/Kklyee/skiller/internal/lock"
+	"github.com/Kklyee/skiller/internal/paths"
 )
 
 func Disable(activeDir, disabledDir, id string) (bool, error) {
+	return withLock(disabledDir, func() (bool, error) {
+		return DisableWithoutLock(activeDir, disabledDir, id)
+	})
+}
+
+func DisableWithoutLock(activeDir, disabledDir, id string) (bool, error) {
 	skills, err := catalog.Scan(activeDir, disabledDir)
 	if err != nil {
 		return false, fmt.Errorf("inspect installed skills: %w", err)
@@ -76,6 +84,31 @@ func Disable(activeDir, disabledDir, id string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func withLock(disabledDir string, operation func() (bool, error)) (bool, error) {
+	journalPath := paths.JournalPath(disabledDir)
+	if _, err := os.Lstat(journalPath); err == nil {
+		return false, fmt.Errorf("unfinished transaction journal exists at %s", journalPath)
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return false, fmt.Errorf("inspect transaction journal %q: %w", journalPath, err)
+	}
+
+	handle, err := lock.Acquire(paths.LockPath(disabledDir))
+	if err != nil {
+		return false, err
+	}
+
+	changed, operationErr := operation()
+	closeErr := handle.Close()
+	if operationErr != nil {
+		return false, operationErr
+	}
+	if closeErr != nil {
+		return false, closeErr
+	}
+
+	return changed, nil
 }
 
 func findSkill(skills []catalog.Skill, id string) (catalog.Skill, bool) {
