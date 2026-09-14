@@ -62,6 +62,10 @@ func groupNameStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
 }
 
+func pinStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("11"))
+}
+
 func stateStyle(state catalog.State) lipgloss.Style {
 	color := lipgloss.Color("8")
 	switch state {

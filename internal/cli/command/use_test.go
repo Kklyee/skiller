@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Kklyee/skiller/internal/group"
+	"github.com/Kklyee/skiller/internal/pin"
 )
 
 func TestUseDryRun(t *testing.T) {
@@ -114,9 +115,43 @@ func TestUseCancelsWithoutChanges(t *testing.T) {
 	}
 }
 
+func TestUseKeepsPinnedSkillsActive(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	groupsDir := filepath.Join(root, "groups")
+	createSkill(t, activeDir, "old")
+	createSkill(t, disabledDir, "wanted")
+	createSkill(t, disabledDir, "pinned")
+	store := group.New(groupsDir)
+	if _, err := store.Create("coding"); err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	if _, err := store.Add("coding", "wanted"); err != nil {
+		t.Fatalf("add group skill: %v", err)
+	}
+	if _, err := pin.New(filepath.Join(root, "pins.toml")).Add("pinned"); err != nil {
+		t.Fatalf("pin skill: %v", err)
+	}
+	setUsePaths(t, activeDir, disabledDir, groupsDir)
+
+	var output bytes.Buffer
+	command := NewUse()
+	command.SetArgs([]string{"coding", "--dry-run"})
+	command.SetOut(&output)
+	command.SetErr(&output)
+	if err := command.Execute(); err != nil {
+		t.Fatalf("execute use dry run: %v", err)
+	}
+	if !strings.Contains(output.String(), "  + wanted") || !strings.Contains(output.String(), "  + pinned") || !strings.Contains(output.String(), "  - old") {
+		t.Fatalf("pinned plan missing:\\n%s", output.String())
+	}
+}
+
 func setUsePaths(t *testing.T, active, disabled, groups string) {
 	t.Helper()
 	t.Setenv("SKILLER_ACTIVE_DIR", active)
 	t.Setenv("SKILLER_DISABLED_DIR", disabled)
 	t.Setenv("SKILLER_GROUPS_DIR", groups)
+	t.Setenv("SKILLER_PINS_FILE", filepath.Join(filepath.Dir(disabled), "pins.toml"))
 }

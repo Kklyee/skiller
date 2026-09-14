@@ -227,7 +227,11 @@ func newProfileUse() *cobra.Command {
 				return err
 			}
 			target := profile.Resolve(stored, groups)
-			plan := reconcile.Build(target.Group, skills)
+			pinned, err := loadPins(pathSet)
+			if err != nil {
+				return err
+			}
+			plan := reconcile.BuildWithPins(target.Group, skills, pinned)
 			for _, name := range target.MissingGroups {
 				plan.Issues = append(plan.Issues, fmt.Sprintf("missing group %s", name))
 			}

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Kklyee/skiller/internal/group"
+	"github.com/Kklyee/skiller/internal/pin"
 	"github.com/Kklyee/skiller/internal/profile"
 	"github.com/Kklyee/skiller/internal/project"
 )
@@ -22,8 +23,12 @@ func TestSyncDirectSkills(t *testing.T) {
 	disabledDir := filepath.Join(root, "disabled")
 	createSkill(t, activeDir, "old")
 	createSkill(t, disabledDir, "wanted")
+	createSkill(t, disabledDir, "pinned")
 	writeProjectConfig(t, projectDir, "skills = [\"wanted\"]\n")
 	setSyncPaths(t, activeDir, disabledDir, filepath.Join(root, "groups"), filepath.Join(root, "profiles"))
+	if _, err := pin.New(filepath.Join(root, "pins.toml")).Add("pinned"); err != nil {
+		t.Fatalf("pin skill: %v", err)
+	}
 	t.Chdir(projectDir)
 
 	var output bytes.Buffer
@@ -34,7 +39,7 @@ func TestSyncDirectSkills(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("sync dry run: %v\n%s", err, output.String())
 	}
-	if !strings.Contains(output.String(), "  + wanted") || !strings.Contains(output.String(), "  - old") {
+	if !strings.Contains(output.String(), "  + wanted") || !strings.Contains(output.String(), "  + pinned") || !strings.Contains(output.String(), "  - old") {
 		t.Fatalf("dry-run output: %q", output.String())
 	}
 	assertProfilePathExists(t, filepath.Join(activeDir, "old", "SKILL.md"))
@@ -54,6 +59,7 @@ func TestSyncDirectSkills(t *testing.T) {
 	}
 	assertProfilePathExists(t, filepath.Join(disabledDir, "old", "SKILL.md"))
 	assertProfilePathExists(t, filepath.Join(activeDir, "wanted", "SKILL.md"))
+	assertProfilePathExists(t, filepath.Join(activeDir, "pinned", "SKILL.md"))
 }
 
 func TestSyncProfile(t *testing.T) {
@@ -130,6 +136,7 @@ func setSyncPaths(t *testing.T, active, disabled, groups, profiles string) {
 	t.Setenv("SKILLER_DISABLED_DIR", disabled)
 	t.Setenv("SKILLER_GROUPS_DIR", groups)
 	t.Setenv("SKILLER_PROFILES_DIR", profiles)
+	t.Setenv("SKILLER_PINS_FILE", filepath.Join(filepath.Dir(disabled), "pins.toml"))
 	t.Setenv("SKILLER_TRANSACTION_JOURNAL", filepath.Join(filepath.Dir(disabled), "transaction.json"))
 	t.Setenv("SKILLER_LOCK", filepath.Join(filepath.Dir(disabled), "lock"))
 }

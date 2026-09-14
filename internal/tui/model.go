@@ -6,6 +6,7 @@ import (
 	"github.com/Kklyee/skiller/internal/doctor"
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/paths"
+	"github.com/Kklyee/skiller/internal/pin"
 	"github.com/Kklyee/skiller/internal/reconcile"
 	"github.com/Kklyee/skiller/internal/transaction"
 	"github.com/Kklyee/skiller/internal/visibility"
@@ -44,6 +45,7 @@ type Model struct {
 
 	skills  []catalog.Skill
 	groups  []group.Group
+	pins    []string
 	summary catalog.Summary
 
 	screen Screen
@@ -107,9 +109,14 @@ func (m *Model) refresh() error {
 	if err != nil {
 		return err
 	}
+	pinned, err := pin.New(m.paths.Pins).List()
+	if err != nil {
+		return err
+	}
 
 	m.skills = skills
 	m.groups = groups
+	m.pins = pinned
 	m.activeGroup = findActiveGroup(groups, skills)
 	m.summary = catalog.Summarize(skills)
 	m.summary.ActiveDir = m.paths.Active
@@ -279,6 +286,10 @@ func (m *Model) selectedSkillValue() (catalog.Skill, bool) {
 	return catalog.Skill{}, false
 }
 
+func (m *Model) isPinned(id string) bool {
+	return slices.Contains(m.pins, id)
+}
+
 func (m *Model) toggleSelectedSkill() {
 	skill, ok := m.selectedSkillValue()
 	if !ok {
@@ -288,6 +299,10 @@ func (m *Model) toggleSelectedSkill() {
 	var err error
 	switch skill.State {
 	case catalog.StateActive:
+		if m.isPinned(skill.ID) {
+			m.setMessage(messageInfo, fmt.Sprintf("Pinned skill %s stays active; unpin it first", skill.ID))
+			return
+		}
 		_, err = visibility.Disable(m.paths.Active, m.paths.Disabled, skill.ID)
 	case catalog.StateDisabled:
 		_, err = visibility.Enable(m.paths.Active, m.paths.Disabled, skill.ID)
@@ -323,7 +338,7 @@ func (m *Model) toggleAllSkills() {
 		desired = nil
 	}
 
-	plan := reconcile.Build(group.Group{Name: "all skills", Skills: desired}, skills)
+	plan := reconcile.BuildWithPins(group.Group{Name: "all skills", Skills: desired}, skills, m.pins)
 	if plan.HasIssues() {
 		m.setMessage(messageError, "Cannot toggle all skills: resolve catalog issues first")
 		return
@@ -353,13 +368,13 @@ func (m *Model) openReconcile() {
 		for _, skill := range m.skills {
 			selected.Skills = append(selected.Skills, skill.ID)
 		}
-		m.plan = reconcile.Build(selected, m.skills)
+		m.plan = reconcile.BuildWithPins(selected, m.skills, m.pins)
 		m.modal = modalReconcile
 		return
 	}
 	for _, group := range m.groups {
 		if group.Name == m.selectedGroup {
-			m.plan = reconcile.Build(group, m.skills)
+			m.plan = reconcile.BuildWithPins(group, m.skills, m.pins)
 			m.modal = modalReconcile
 			return
 		}

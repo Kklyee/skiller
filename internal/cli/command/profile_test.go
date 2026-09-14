@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Kklyee/skiller/internal/group"
+	"github.com/Kklyee/skiller/internal/pin"
 	"github.com/Kklyee/skiller/internal/profile"
 )
 
@@ -19,6 +20,7 @@ func TestProfileCommandsAndUse(t *testing.T) {
 	profilesDir := filepath.Join(root, "profiles")
 	createSkill(t, activeDir, "old")
 	createSkill(t, disabledDir, "wanted")
+	createSkill(t, disabledDir, "pinned")
 
 	groups := group.New(groupsDir)
 	if _, err := groups.Create("coding"); err != nil {
@@ -28,6 +30,9 @@ func TestProfileCommandsAndUse(t *testing.T) {
 		t.Fatalf("add group skill: %v", err)
 	}
 	setProfilePaths(t, activeDir, disabledDir, groupsDir, profilesDir)
+	if _, err := pin.New(filepath.Join(root, "pins.toml")).Add("pinned"); err != nil {
+		t.Fatalf("pin skill: %v", err)
+	}
 
 	if output := executeProfileCommand(t, "create", "go-backend"); strings.TrimSpace(output) != "Created profile go-backend" {
 		t.Fatalf("create output: %q", output)
@@ -49,7 +54,7 @@ func TestProfileCommandsAndUse(t *testing.T) {
 	}
 
 	output = executeProfileCommand(t, "use", "go-backend", "--dry-run")
-	if !strings.Contains(output, "  + wanted") || !strings.Contains(output, "  - old") {
+	if !strings.Contains(output, "  + wanted") || !strings.Contains(output, "  + pinned") || !strings.Contains(output, "  - old") {
 		t.Fatalf("dry-run output: %q", output)
 	}
 	assertProfilePathExists(t, filepath.Join(activeDir, "old", "SKILL.md"))
@@ -69,6 +74,7 @@ func TestProfileCommandsAndUse(t *testing.T) {
 	}
 	assertProfilePathExists(t, filepath.Join(disabledDir, "old", "SKILL.md"))
 	assertProfilePathExists(t, filepath.Join(activeDir, "wanted", "SKILL.md"))
+	assertProfilePathExists(t, filepath.Join(activeDir, "pinned", "SKILL.md"))
 
 	if output := executeProfileCommand(t, "delete", "go-backend"); strings.TrimSpace(output) != "Deleted profile go-backend" {
 		t.Fatalf("delete output: %q", output)
@@ -117,6 +123,7 @@ func setProfilePaths(t *testing.T, active, disabled, groups, profiles string) {
 	t.Setenv("SKILLER_DISABLED_DIR", disabled)
 	t.Setenv("SKILLER_GROUPS_DIR", groups)
 	t.Setenv("SKILLER_PROFILES_DIR", profiles)
+	t.Setenv("SKILLER_PINS_FILE", filepath.Join(filepath.Dir(disabled), "pins.toml"))
 	t.Setenv("SKILLER_TRANSACTION_JOURNAL", filepath.Join(filepath.Dir(disabled), "transaction.json"))
 	t.Setenv("SKILLER_LOCK", filepath.Join(filepath.Dir(disabled), "lock"))
 }

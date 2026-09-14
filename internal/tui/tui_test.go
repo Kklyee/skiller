@@ -15,6 +15,7 @@ import (
 	"github.com/Kklyee/skiller/internal/doctor"
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/paths"
+	"github.com/Kklyee/skiller/internal/pin"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -62,7 +63,7 @@ func TestMainViewAndKeyboardInteractions(t *testing.T) {
 	}
 	model.Update(bubbletea.WindowSizeMsg{Width: 120, Height: 30})
 	view := viewText(&model)
-	for _, want := range []string{"Skill Visibility Manager", "alpha", "beta", "coding", "Details", "Active", "Disabled"} {
+	for _, want := range []string{"Skill Environment Controller", "alpha", "beta", "coding", "Details", "Active", "Disabled"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("view missing %q:\n%s", want, view)
 		}
@@ -266,7 +267,7 @@ func TestMainUsesPersistentStartupLogoAboveSummary(t *testing.T) {
 		if strings.Contains(line, "╭─╮") {
 			logoStart = index
 		}
-		if strings.Contains(line, "Skill Visibility Manager") {
+		if strings.Contains(line, "Skill Environment Controller") {
 			logoEnd = index
 		}
 		if strings.Contains(line, "Installed") {
@@ -947,6 +948,7 @@ func TestDetailsPanelIsReadOnlySummary(t *testing.T) {
 		"Description: First skill",
 		"Status: active",
 		"Groups: coding",
+		"Pinned: no",
 	}; !slices.Equal(got, want) {
 		t.Fatalf("details panel = %q, want %q", got, want)
 	}
@@ -962,6 +964,51 @@ func TestDetailsPanelIsReadOnlySummary(t *testing.T) {
 	model.Update(keyCode(bubbletea.KeyTab))
 	if model.focus != FocusGroups {
 		t.Fatalf("second tab focus = %v, want groups", model.focus)
+	}
+}
+
+func TestTUIShowsPinnedSkillsAndKeepsThemActive(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	pinsPath := filepath.Join(root, "pins.toml")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+	createSkill(t, disabledDir, "beta", "Beta", "Second skill")
+	if _, err := pin.New(pinsPath).Add("beta"); err != nil {
+		t.Fatalf("pin beta: %v", err)
+	}
+
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: disabledDir,
+		Pins:     pinsPath,
+		Groups:   filepath.Join(root, "groups"),
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(keyCode(bubbletea.KeyTab))
+	model.Update(keyCode(bubbletea.KeyDown))
+
+	view := viewText(&model)
+	if !strings.Contains(view, "◆ ○ Beta [beta]") {
+		t.Fatalf("pinned skill marker missing:\n%s", view)
+	}
+	if !strings.Contains(view, "Pinned: yes") {
+		t.Fatalf("pinned detail missing:\n%s", view)
+	}
+	model.Update(keyText(" "))
+	if _, err := os.Stat(filepath.Join(activeDir, "beta", "SKILL.md")); err != nil {
+		t.Fatalf("pinned skill was not enabled: %v", err)
+	}
+	model.Update(keyText(" "))
+	if _, err := os.Stat(filepath.Join(activeDir, "beta", "SKILL.md")); err != nil {
+		t.Fatalf("pinned skill was disabled: %v", err)
+	}
+	if !strings.Contains(viewText(&model), "unpin it first") {
+		t.Fatalf("pinned toggle message missing:\n%s", viewText(&model))
 	}
 }
 

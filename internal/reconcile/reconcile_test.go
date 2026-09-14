@@ -38,6 +38,35 @@ func TestBuildPlan(t *testing.T) {
 	}
 }
 
+func TestBuildWithPinsAlwaysIncludesPinnedSkills(t *testing.T) {
+	plan := BuildWithPins(
+		group.Group{Name: "coding", Skills: []string{"wanted"}},
+		[]catalog.Skill{
+			{ID: "wanted", State: catalog.StateActive},
+			{ID: "pinned", State: catalog.StateDisabled},
+			{ID: "old", State: catalog.StateActive},
+		},
+		[]string{"pinned"},
+	)
+
+	assertStrings(t, plan.Enable, "pinned")
+	assertStrings(t, plan.Disable, "old")
+	assertStrings(t, plan.Keep, "wanted")
+}
+
+func TestBuildWithPinsReportsMissingPinnedSkills(t *testing.T) {
+	plan := BuildWithPins(
+		group.Group{Name: "coding", Skills: []string{"wanted"}},
+		[]catalog.Skill{{ID: "wanted", State: catalog.StateActive}},
+		[]string{"missing-pin"},
+	)
+
+	assertStrings(t, plan.Missing, "missing-pin")
+	if !plan.HasIssues() {
+		t.Fatal("expected missing pinned skill to block the plan")
+	}
+}
+
 func TestApplyPlan(t *testing.T) {
 	root := t.TempDir()
 	activeDir := filepath.Join(root, "active")

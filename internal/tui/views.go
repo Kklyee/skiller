@@ -184,7 +184,7 @@ func (m *Model) viewSkillsPanel() string {
 	}
 	start, end := viewportBounds(len(visible), selected, contentHeight)
 	for _, skill := range visible[start:end] {
-		lines = append(lines, skillRow(skill, skill.ID == m.selectedSkill))
+		lines = append(lines, skillRowWithPin(skill, skill.ID == m.selectedSkill, m.isPinned(skill.ID)))
 	}
 	return strings.Join(lines, "\n")
 }
@@ -226,6 +226,11 @@ func (m *Model) viewDetailsPanel() string {
 		"Status: " + stateStyle(skill.State).Render(skill.State.String()),
 		"Groups: " + strings.Join(groups, ", "),
 	}
+	pinned := "no"
+	if m.isPinned(skill.ID) {
+		pinned = pinStyle().Render("yes")
+	}
+	lines = append(lines, "Pinned: "+pinned)
 	return strings.Join(lines, "\n")
 }
 
@@ -387,7 +392,7 @@ func (m *Model) viewGroupManagerDetails() string {
 		}
 	}
 
-	plan := reconcile.Build(group, m.skills)
+	plan := reconcile.BuildWithPins(group, m.skills, m.pins)
 	lines = append(lines,
 		"",
 		helpTextStyle().Bold(true).Render("Activation Preview"),
@@ -522,6 +527,10 @@ func stateLine(skill catalog.Skill) string {
 }
 
 func skillRow(skill catalog.Skill, selected bool) string {
+	return skillRowWithPin(skill, selected, false)
+}
+
+func skillRowWithPin(skill catalog.Skill, selected, pinned bool) string {
 	name := displayName(skill)
 	if name != skill.ID {
 		name = fmt.Sprintf("%s [%s]", name, skill.ID)
@@ -529,7 +538,11 @@ func skillRow(skill catalog.Skill, selected bool) string {
 	if selected {
 		name = selectedRowStyle().Render(name)
 	}
-	return fmt.Sprintf("%s %s", stateStyle(skill.State).Render(stateIcon(skill.State)), name)
+	row := fmt.Sprintf("%s %s", stateStyle(skill.State).Render(stateIcon(skill.State)), name)
+	if pinned {
+		row = pinStyle().Render("◆") + " " + row
+	}
+	return row
 }
 
 func sourceLine(skill catalog.Skill) string {

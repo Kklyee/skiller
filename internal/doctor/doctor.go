@@ -6,9 +6,11 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/Kklyee/skiller/internal/catalog"
 	"github.com/Kklyee/skiller/internal/paths"
+	"github.com/Kklyee/skiller/internal/pin"
 )
 
 type Level uint8
@@ -111,11 +113,44 @@ func Inspect(pathSet paths.Set) Report {
 		report.add("Skills", issueCheck("Conflicts", report.Summary.Conflict))
 		report.add("Skills", issueCheck("Broken links", report.Summary.Broken))
 		report.add("Skills", issueCheck("Invalid directories", report.Summary.Invalid))
+		report.add("Skills", pinsCheck(pathSet.Pins, skills))
 	}
 
 	report.add("Transactions", journalCheck(pathSet.Journal))
 
 	return report
+}
+
+func pinsCheck(path string, skills []catalog.Skill) Check {
+	pinned, err := pin.New(path).List()
+	if err != nil {
+		return Check{Name: "Pinned skills", Level: Error, Detail: err.Error()}
+	}
+
+	byID := make(map[string]catalog.Skill, len(skills))
+	for _, skill := range skills {
+		byID[skill.ID] = skill
+	}
+	invalid := make([]string, 0)
+	for _, id := range pinned {
+		skill, ok := byID[id]
+		if !ok {
+			invalid = append(invalid, id+" (missing)")
+			continue
+		}
+		switch skill.State {
+		case catalog.StateConflict, catalog.StateBroken, catalog.StateInvalid:
+			invalid = append(invalid, fmt.Sprintf("%s (%s)", id, skill.State))
+		}
+	}
+	if len(invalid) > 0 {
+		return Check{
+			Name:   "Pinned skills",
+			Level:  Error,
+			Detail: "invalid: " + strings.Join(invalid, ", "),
+		}
+	}
+	return Check{Name: "Pinned skills", Level: Healthy, Detail: fmt.Sprintf("%d pinned", len(pinned))}
 }
 
 func (r *Report) add(section string, check Check) {

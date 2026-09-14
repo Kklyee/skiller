@@ -19,7 +19,7 @@ func Execute() error {
 func NewRootCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "skiller",
-		Short:         "AI Skill Visibility Manager",
+		Short:         "AI Skill Environment Controller",
 		Version:       version.Version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -53,6 +53,9 @@ func NewRootCommand() *cobra.Command {
 		command.NewGroup(),
 		command.NewUse(),
 		command.NewProfile(),
+		command.NewPin(),
+		command.NewUnpin(),
+		command.NewPins(),
 		command.NewSync(),
 		command.NewRun(),
 		command.NewVersion(),

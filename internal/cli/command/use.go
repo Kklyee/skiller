@@ -32,7 +32,11 @@ func NewUse() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			plan := reconcile.Build(selected, skills)
+			pinned, err := loadPins(pathSet)
+			if err != nil {
+				return err
+			}
+			plan := reconcile.BuildWithPins(selected, skills, pinned)
 			if err := writePlan(cmd, plan); err != nil {
 				return err
 			}

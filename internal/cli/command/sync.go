@@ -76,6 +76,10 @@ func syncPlan(pathSet paths.Set) (reconcile.Plan, string, error) {
 	if err != nil {
 		return reconcile.Plan{}, "", fmt.Errorf("inspect installed skills: %w", err)
 	}
+	pinned, err := loadPins(pathSet)
+	if err != nil {
+		return reconcile.Plan{}, "", err
+	}
 
 	var selected group.Group
 	var missingGroups []string
@@ -95,7 +99,7 @@ func syncPlan(pathSet paths.Set) (reconcile.Plan, string, error) {
 		selected = group.Group{Name: "project", Skills: config.Skills}
 	}
 
-	plan := reconcile.Build(selected, skills)
+	plan := reconcile.BuildWithPins(selected, skills, pinned)
 	for _, name := range missingGroups {
 		plan.Issues = append(plan.Issues, fmt.Sprintf("missing group %s", name))
 	}

@@ -114,7 +114,7 @@ func startupLogo(frame int) string {
 		return strings.Join([]string{
 			boxStyle.Render("╭─╮"),
 			boxStyle.Render("╰─╮") + "  " + brandStyle.Render("SKILLER"),
-			boxStyle.Render("╰─╯") + "  " + secondaryStyle.Render("Skill Visibility Manager"),
+			boxStyle.Render("╰─╯") + "  " + secondaryStyle.Render("Skill Environment Controller"),
 		}, "\n")
 	}
 }

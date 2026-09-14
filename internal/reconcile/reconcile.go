@@ -20,9 +20,16 @@ type Plan struct {
 }
 
 func Build(selected group.Group, skills []catalog.Skill) Plan {
+	return BuildWithPins(selected, skills, nil)
+}
+
+func BuildWithPins(selected group.Group, skills []catalog.Skill, pinned []string) Plan {
 	plan := Plan{Group: selected.Name}
-	desired := make(map[string]struct{}, len(selected.Skills))
+	desired := make(map[string]struct{}, len(selected.Skills)+len(pinned))
 	for _, skill := range selected.Skills {
+		desired[skill] = struct{}{}
+	}
+	for _, skill := range pinned {
 		desired[skill] = struct{}{}
 	}
 
@@ -49,7 +56,14 @@ func Build(selected group.Group, skills []catalog.Skill) Plan {
 		}
 	}
 
+	requested := make(map[string]struct{}, len(selected.Skills)+len(pinned))
 	for _, skill := range selected.Skills {
+		requested[skill] = struct{}{}
+	}
+	for _, skill := range pinned {
+		requested[skill] = struct{}{}
+	}
+	for skill := range requested {
 		if _, ok := known[skill]; !ok {
 			plan.Missing = append(plan.Missing, skill)
 		}
