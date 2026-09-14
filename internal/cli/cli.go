@@ -48,6 +48,7 @@ func NewRootCommand() *cobra.Command {
 		command.NewDoctor(),
 		command.NewGroup(),
 		command.NewUse(),
+		command.NewProfile(),
 		command.NewTUI(),
 	)
 

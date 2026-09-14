@@ -10,6 +10,7 @@ const (
 	activeDirEnv   = "SKILLER_ACTIVE_DIR"
 	disabledDirEnv = "SKILLER_DISABLED_DIR"
 	groupsDirEnv   = "SKILLER_GROUPS_DIR"
+	profilesDirEnv = "SKILLER_PROFILES_DIR"
 	journalEnv     = "SKILLER_TRANSACTION_JOURNAL"
 	lockEnv        = "SKILLER_LOCK"
 )
@@ -18,6 +19,7 @@ type Set struct {
 	Active   string
 	Disabled string
 	Groups   string
+	Profiles string
 	Journal  string
 	Lock     string
 }
@@ -31,6 +33,7 @@ func Default() (Set, error) {
 	active := filepath.Join(home, ".agents", "skills")
 	disabled := filepath.Join(home, ".skiller", "disabled")
 	groups := filepath.Join(home, ".skiller", "groups")
+	profiles := filepath.Join(home, ".skiller", "profiles")
 
 	if value, ok := os.LookupEnv(activeDirEnv); ok && value != "" {
 		active = value
@@ -44,10 +47,15 @@ func Default() (Set, error) {
 		groups = value
 	}
 
+	if value, ok := os.LookupEnv(profilesDirEnv); ok && value != "" {
+		profiles = value
+	}
+
 	return Set{
 		Active:   active,
 		Disabled: disabled,
 		Groups:   groups,
+		Profiles: profiles,
 		Journal:  JournalPath(disabled),
 		Lock:     LockPath(disabled),
 	}, nil
