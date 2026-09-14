@@ -60,7 +60,7 @@ func TestMainViewAndKeyboardInteractions(t *testing.T) {
 	}
 	model.Update(bubbletea.WindowSizeMsg{Width: 120, Height: 30})
 	view := viewText(&model)
-	for _, want := range []string{"Skiller", "alpha", "beta", "coding", "Details", "Active", "Disabled"} {
+	for _, want := range []string{"◆ SKILLER", "alpha", "beta", "coding", "Details", "Active", "Disabled"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("view missing %q:\n%s", want, view)
 		}
@@ -100,6 +100,76 @@ func TestMainViewAndKeyboardInteractions(t *testing.T) {
 	model.Update(keyText("g"))
 	if !strings.Contains(viewText(&model), "Skiller / Groups") {
 		t.Fatalf("groups screen missing:\n%s", viewText(&model))
+	}
+}
+
+func TestStartupLogoAnimationProgressesAndCanBeSkipped(t *testing.T) {
+	t.Setenv("NO_COLOR", "")
+	t.Setenv("TERM", "xterm")
+	root := t.TempDir()
+	model, err := NewModel(paths.Set{
+		Active:   filepath.Join(root, "active"),
+		Disabled: filepath.Join(root, "disabled"),
+		Groups:   filepath.Join(root, "groups"),
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+
+	model.queueStartupAnimation()
+	model.Update(bubbletea.WindowSizeMsg{Width: 120, Height: 30})
+	if !model.startupActive {
+		t.Fatal("startup animation did not start")
+	}
+	if view := viewText(&model); !strings.Contains(view, "·") {
+		t.Fatalf("initial startup frame missing:\n%s", view)
+	}
+
+	model.Update(startupTickMsg{})
+	if view := viewText(&model); !strings.Contains(view, "╭─╮") {
+		t.Fatalf("logo frame missing after tick:\n%s", view)
+	}
+	model.Update(startupTickMsg{})
+	if view := viewText(&model); !strings.Contains(view, "SKILLER") {
+		t.Fatalf("brand missing after tick:\n%s", view)
+	}
+
+	model.Update(keyText("x"))
+	if model.startupActive {
+		t.Fatal("startup animation did not skip on key press")
+	}
+	if view := viewText(&model); !strings.Contains(view, "Installed") {
+		t.Fatalf("main view did not resume after skip:\n%s", view)
+	}
+}
+
+func TestStartupLogoAnimationSkipsWhenUnsupported(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	root := t.TempDir()
+	model, err := NewModel(paths.Set{
+		Active:   filepath.Join(root, "active"),
+		Disabled: filepath.Join(root, "disabled"),
+		Groups:   filepath.Join(root, "groups"),
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+
+	model.queueStartupAnimation()
+	model.Update(bubbletea.WindowSizeMsg{Width: 120, Height: 30})
+	if model.startupActive || model.startupPending {
+		t.Fatal("startup animation started with NO_COLOR")
+	}
+
+	t.Setenv("NO_COLOR", "")
+	model.queueStartupAnimation()
+	model.Update(bubbletea.WindowSizeMsg{Width: 50, Height: 30})
+	if model.startupActive {
+		t.Fatal("startup animation started in a small terminal")
 	}
 }
 

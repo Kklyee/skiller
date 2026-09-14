@@ -2,8 +2,10 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"slices"
 	"strings"
+	"time"
 
 	bubbletea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -84,6 +86,10 @@ type Model struct {
 	messageLevel messageKind
 	width        int
 	height       int
+
+	startupPending bool
+	startupActive  bool
+	startupFrame   int
 }
 
 type mainColumn struct {
@@ -97,6 +103,11 @@ type keyHint struct {
 	key         string
 	description string
 }
+
+type startupTickMsg struct{}
+
+const startupFrameCount = 4
+const startupFrameInterval = 160 * time.Millisecond
 
 func NewModel(pathSet paths.Set) (Model, error) {
 	model := Model{
@@ -118,6 +129,9 @@ func Run(pathSet paths.Set) error {
 	if err != nil {
 		return err
 	}
+	if interactiveTerminal() {
+		model.queueStartupAnimation()
+	}
 
 	_, err = bubbletea.NewProgram(&model).Run()
 	return err
@@ -132,7 +146,32 @@ func (m *Model) Update(message bubbletea.Msg) (bubbletea.Model, bubbletea.Cmd) {
 	case bubbletea.WindowSizeMsg:
 		m.width = message.Width
 		m.height = message.Height
+		if m.startupPending {
+			m.startupPending = false
+			if m.width >= 60 && m.height >= 8 {
+				m.startupActive = true
+				m.startupFrame = 0
+				return m, m.startupTick()
+			}
+		}
+		if m.startupActive && (m.width < 60 || m.height < 8) {
+			m.finishStartup()
+		}
+	case startupTickMsg:
+		if !m.startupActive {
+			return m, nil
+		}
+		if m.startupFrame >= startupFrameCount-1 {
+			m.finishStartup()
+			return m, nil
+		}
+		m.startupFrame++
+		return m, m.startupTick()
 	case bubbletea.KeyPressMsg:
+		if m.startupActive {
+			m.finishStartup()
+			return m, nil
+		}
 		return m, m.updateKey(message)
 	}
 
@@ -148,6 +187,9 @@ func (m *Model) View() bubbletea.View {
 func (m *Model) viewContent() string {
 	if m.width < 60 || m.height < 8 {
 		return "Terminal too small. Resize to at least 60x8.\n"
+	}
+	if m.startupActive {
+		return m.viewStartup()
 	}
 	if m.modal == modalReconcile {
 		return m.viewReconcileModal()
@@ -166,6 +208,80 @@ func (m *Model) viewContent() string {
 		return m.viewHelp()
 	default:
 		return m.viewMain()
+	}
+}
+
+func (m *Model) queueStartupAnimation() {
+	if !startupAnimationAllowed() {
+		return
+	}
+	m.startupPending = true
+	m.startupActive = false
+	m.startupFrame = 0
+}
+
+func startupAnimationAllowed() bool {
+	return os.Getenv("NO_COLOR") == "" && !strings.EqualFold(os.Getenv("TERM"), "dumb")
+}
+
+func interactiveTerminal() bool {
+	for _, file := range []*os.File{os.Stdin, os.Stdout} {
+		info, err := file.Stat()
+		if err != nil || info.Mode()&os.ModeCharDevice == 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func (m *Model) startupTick() bubbletea.Cmd {
+	return bubbletea.Tick(startupFrameInterval, func(time.Time) bubbletea.Msg {
+		return startupTickMsg{}
+	})
+}
+
+func (m *Model) finishStartup() {
+	m.startupPending = false
+	m.startupActive = false
+	m.startupFrame = startupFrameCount - 1
+}
+
+func (m *Model) viewStartup() string {
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, startupLogo(m.startupFrame))
+}
+
+func startupLogo(frame int) string {
+	if frame < 0 {
+		frame = 0
+	}
+	if frame >= startupFrameCount {
+		frame = startupFrameCount - 1
+	}
+
+	boxStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6"))
+	brandStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10"))
+	secondaryStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+	switch frame {
+	case 0:
+		return boxStyle.Render("·")
+	case 1:
+		return strings.Join([]string{
+			boxStyle.Render("╭─╮"),
+			boxStyle.Render("╰─╮"),
+			boxStyle.Render("╰─╯"),
+		}, "\n")
+	case 2:
+		return strings.Join([]string{
+			boxStyle.Render("╭─╮"),
+			boxStyle.Render("╰─╮") + "  " + brandStyle.Render("SKILLER"),
+			boxStyle.Render("╰─╯"),
+		}, "\n")
+	default:
+		return strings.Join([]string{
+			boxStyle.Render("╭─╮"),
+			boxStyle.Render("╰─╮") + "  " + brandStyle.Render("SKILLER"),
+			boxStyle.Render("╰─╯") + "  " + secondaryStyle.Render("Skill Visibility Manager"),
+		}, "\n")
 	}
 }
 
@@ -821,7 +937,7 @@ func (m *Model) viewHeader() string {
 		groupName = m.selectedGroup
 	}
 	parts := []string{
-		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller"),
+		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("◆ SKILLER"),
 		headerMetric("Installed", m.summary.Installed, "6"),
 		headerMetric("Active", m.summary.Active, "10"),
 		headerMetric("Disabled", m.summary.Disabled, "8"),
