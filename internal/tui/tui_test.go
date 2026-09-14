@@ -122,7 +122,7 @@ func TestInitStartsTerminalResizePolling(t *testing.T) {
 	}
 }
 
-func TestResizePollUpdatesModelSize(t *testing.T) {
+func TestResizePollRoutesThroughWindowSizeMessage(t *testing.T) {
 	root := t.TempDir()
 	model, err := NewModel(paths.Set{
 		Active:   filepath.Join(root, "active"),
@@ -136,10 +136,30 @@ func TestResizePollUpdatesModelSize(t *testing.T) {
 	}
 
 	model.Update(bubbletea.WindowSizeMsg{Width: 80, Height: 20})
-	model.Update(resizePollMsg{width: 160, height: 40, valid: true})
+	_, cmd := model.Update(resizePollMsg{width: 160, height: 40, valid: true})
+	if model.width != 80 || model.height != 20 {
+		t.Fatalf("resize poll bypassed WindowSizeMsg and changed model to %dx%d", model.width, model.height)
+	}
+	if cmd == nil {
+		t.Fatal("resize poll returned no commands")
+	}
+	commandMessage := cmd()
+	batch, ok := commandMessage.(bubbletea.BatchMsg)
+	if !ok || len(batch) < 1 {
+		t.Fatalf("resize poll command = %T, want BatchMsg", commandMessage)
+	}
+	firstMessage := batch[0]()
+	message, ok := firstMessage.(bubbletea.WindowSizeMsg)
+	if !ok {
+		t.Fatalf("first resize command = %T, want WindowSizeMsg", firstMessage)
+	}
+	if message.Width != 160 || message.Height != 40 {
+		t.Fatalf("window size message = %dx%d, want 160x40", message.Width, message.Height)
+	}
 
+	model.Update(message)
 	if model.width != 160 || model.height != 40 {
-		t.Fatalf("model size after resize poll = %dx%d, want 160x40", model.width, model.height)
+		t.Fatalf("model size after WindowSizeMsg = %dx%d, want 160x40", model.width, model.height)
 	}
 }
 

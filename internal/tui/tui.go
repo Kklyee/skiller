@@ -155,13 +155,12 @@ func (m *Model) Update(message bubbletea.Msg) (bubbletea.Model, bubbletea.Cmd) {
 	case bubbletea.WindowSizeMsg:
 		return m, m.applyWindowSize(message.Width, message.Height)
 	case resizePollMsg:
-		resizeCmd := bubbletea.Cmd(nil)
-		if message.valid {
-			resizeCmd = m.applyWindowSize(message.width, message.height)
-		}
 		pollCmd := m.resizePoll()
-		if resizeCmd == nil {
+		if !message.valid {
 			return m, pollCmd
+		}
+		resizeCmd := func() bubbletea.Msg {
+			return bubbletea.WindowSizeMsg{Width: message.width, Height: message.height}
 		}
 		return m, bubbletea.Batch(resizeCmd, pollCmd)
 	case startupTickMsg:
