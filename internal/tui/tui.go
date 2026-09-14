@@ -230,6 +230,10 @@ func (m *Model) updateKey(message bubbletea.KeyMsg) bubbletea.Cmd {
 		if m.focus == FocusSkills {
 			m.toggleSelectedSkill()
 		}
+	case "a":
+		if m.focus == FocusSkills {
+			m.toggleAllSkills()
+		}
 	case "/":
 		m.searchActive = true
 		m.search = ""
@@ -570,6 +574,48 @@ func (m *Model) toggleSelectedSkill() {
 	m.setMessage(messageSuccess, fmt.Sprintf("Toggled %s", skill.ID))
 }
 
+func (m *Model) toggleAllSkills() {
+	skills := m.visibleSkills()
+	if len(skills) == 0 {
+		return
+	}
+
+	allActive := true
+	desired := make([]string, 0, len(skills))
+	for _, skill := range skills {
+		desired = append(desired, skill.ID)
+		if skill.State != catalog.StateActive {
+			allActive = false
+		}
+	}
+	if allActive {
+		desired = nil
+	}
+
+	plan := reconcile.Build(group.Group{Name: "all skills", Skills: desired}, skills)
+	if plan.HasIssues() {
+		m.setMessage(messageError, "Cannot toggle all skills: resolve catalog issues first")
+		return
+	}
+	if plan.Changes() == 0 {
+		return
+	}
+	if err := transaction.Apply(m.paths, plan); err != nil {
+		m.setError(err)
+		return
+	}
+	if err := m.refresh(); err != nil {
+		m.setError(err)
+		return
+	}
+
+	if allActive {
+		m.setMessage(messageSuccess, "Disabled all visible skills")
+	} else {
+		m.setMessage(messageSuccess, "Activated all visible skills")
+	}
+}
+
 func (m *Model) openReconcile() {
 	if m.selectedGroup == "" {
 		m.setMessage(messageInfo, "Select a group before pressing u")
@@ -908,7 +954,10 @@ func (m *Model) viewFooter() string {
 		{key: "tab", description: "focus"},
 	}
 	if m.focus == FocusSkills {
-		hints = append(hints, keyHint{key: "space", description: "toggle"})
+		hints = append(hints,
+			keyHint{key: "space", description: "toggle"},
+			keyHint{key: "a", description: "all"},
+		)
 	}
 	hints = append(hints,
 		keyHint{key: "/", description: "search"},
@@ -1110,6 +1159,7 @@ func (m *Model) viewHelp() string {
 		helpLine("↑/k ↓/j", "move selection"),
 		helpLine("tab", "switch panel focus"),
 		helpLine("space", "toggle selected skill"),
+		helpLine("a", "toggle all visible skills"),
 		helpLine("/", "search by ID, metadata, or group"),
 		helpLine("g", "group management"),
 		helpLine("u", "preview and apply selected group"),

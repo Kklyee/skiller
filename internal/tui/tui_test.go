@@ -122,6 +122,51 @@ func TestSpaceOnlyTogglesSkillsWhenSkillsFocused(t *testing.T) {
 	}
 }
 
+func TestSkillsFocusATogglesAllVisibleSkills(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+	createSkill(t, disabledDir, "beta", "Beta", "Second skill")
+
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: disabledDir,
+		Groups:   filepath.Join(root, "groups"),
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyTab})
+	if footer := model.viewFooter(); !strings.Contains(footer, "a all") {
+		t.Fatalf("skills footer missing select-all action:\n%s", footer)
+	}
+
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'a'}})
+	if skills, err := scanForTest(activeDir, disabledDir); err != nil {
+		t.Fatalf("scan after activate all: %v", err)
+	} else {
+		for _, skill := range skills {
+			if skill.State != catalog.StateActive {
+				t.Fatalf("after first a, %s state = %s, want active", skill.ID, skill.State)
+			}
+		}
+	}
+
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'a'}})
+	if skills, err := scanForTest(activeDir, disabledDir); err != nil {
+		t.Fatalf("scan after disable all: %v", err)
+	} else {
+		for _, skill := range skills {
+			if skill.State != catalog.StateDisabled {
+				t.Fatalf("after second a, %s state = %s, want disabled", skill.ID, skill.State)
+			}
+		}
+	}
+}
+
 func TestGroupFocusEnterOpensGroupsPage(t *testing.T) {
 	root := t.TempDir()
 	groupsDir := filepath.Join(root, "groups")
