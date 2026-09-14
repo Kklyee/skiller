@@ -1375,7 +1375,7 @@ func (m *Model) viewGroupDetails() string {
 }
 
 func (m *Model) viewReconcileModal() string {
-	lines := []string{"Activate Group: " + m.plan.Group, "", messageStyle(messageSuccess).Render("Enable")}
+	lines := []string{messageStyle(messageSuccess).Render("Enable")}
 	for _, id := range m.plan.Enable {
 		lines = append(lines, messageStyle(messageSuccess).Render("  +")+" "+id)
 	}
@@ -1399,7 +1399,15 @@ func (m *Model) viewReconcileModal() string {
 			lines = append(lines, messageStyle(messageError).Render("  !")+" "+issue)
 		}
 	}
-	lines = append(lines, "", fmt.Sprintf("%d enable  %d disable  %d unchanged", len(m.plan.Enable), len(m.plan.Disable), len(m.plan.Keep)))
+	lines = append(lines,
+		"",
+		helpTextStyle().Bold(true).Render("Summary"),
+		strings.Join([]string{
+			messageStyle(messageSuccess).Render(fmt.Sprintf("%d enable", len(m.plan.Enable))),
+			messageStyle(messageError).Render(fmt.Sprintf("%d disable", len(m.plan.Disable))),
+			helpTextStyle().Render(fmt.Sprintf("%d unchanged", len(m.plan.Keep))),
+		}, "  "),
+	)
 	if m.plan.HasIssues() {
 		lines = append(lines, "Cannot apply until issues are resolved")
 	}
@@ -1409,7 +1417,7 @@ func (m *Model) viewReconcileModal() string {
 
 	return strings.Join([]string{
 		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Reconcile"),
-		m.panel("Activate", strings.Join(lines, "\n"), m.width, m.height-3, true),
+		m.panel("Activate Group: "+m.plan.Group, strings.Join(lines, "\n"), m.width, m.height-3, true),
 		renderKeyHints(keyHint{key: "enter", description: "apply"}, keyHint{key: "esc", description: "cancel"}),
 	}, "\n")
 }

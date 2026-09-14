@@ -549,6 +549,9 @@ func TestReconcileModalAppliesGroup(t *testing.T) {
 	if !strings.Contains(viewText(&model), "Enable") || !strings.Contains(viewText(&model), "Disable") {
 		t.Fatalf("reconcile plan missing:\n%s", viewText(&model))
 	}
+	if !strings.Contains(viewText(&model), "Summary") {
+		t.Fatalf("reconcile plan summary missing:\n%s", viewText(&model))
+	}
 	model.Update(keyCode(bubbletea.KeyEnter))
 	if model.modal != modalNone {
 		t.Fatal("reconcile modal did not close")
