@@ -244,6 +244,53 @@ func TestSkillStateBadgesUseSemanticColors(t *testing.T) {
 	}
 }
 
+func TestCreatingGroupOpensSkillSelector(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	groupsDir := filepath.Join(root, "groups")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+	createSkill(t, disabledDir, "beta", "Beta", "Second skill")
+
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: disabledDir,
+		Groups:   groupsDir,
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'g'}})
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'n'}})
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune("coding")})
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEnter})
+
+	if model.screen != ScreenGroupEditor {
+		t.Fatalf("screen after group creation = %v, want group editor", model.screen)
+	}
+	for _, want := range []string{"Edit Group: coding", "alpha", "beta", "[ ]"} {
+		if !strings.Contains(model.View(), want) {
+			t.Fatalf("selector missing %q:\n%s", want, model.View())
+		}
+	}
+
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{' '}})
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyDown})
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{' '}})
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'s'}})
+
+	created, err := group.New(groupsDir).Get("coding")
+	if err != nil {
+		t.Fatalf("read created group: %v", err)
+	}
+	if want := []string{"alpha", "beta"}; !slices.Equal(created.Skills, want) {
+		t.Fatalf("created group skills = %v, want %v", created.Skills, want)
+	}
+}
+
 func createSkill(t *testing.T, parent, id, name, description string) {
 	t.Helper()
 	dir := filepath.Join(parent, id)

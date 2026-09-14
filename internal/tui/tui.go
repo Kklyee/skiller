@@ -341,7 +341,8 @@ func (m *Model) updateModal(message bubbletea.KeyMsg) bubbletea.Cmd {
 				m.message = err.Error()
 			} else {
 				m.selectedGroup = name
-				m.message = fmt.Sprintf("Created group %s", name)
+				m.message = fmt.Sprintf("Created group %s; select skills", name)
+				m.openEditor()
 			}
 			m.modal = modalNone
 		case bubbletea.KeyBackspace, bubbletea.KeyDelete:
