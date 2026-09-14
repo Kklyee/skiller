@@ -481,6 +481,50 @@ func TestFocusedPanelsHaveVisibleBorders(t *testing.T) {
 	}
 }
 
+func TestGroupsShowCurrentlyActiveGroup(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	groupsDir := filepath.Join(root, "groups")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+	createSkill(t, disabledDir, "beta", "Beta", "Second skill")
+
+	store := group.New(groupsDir)
+	for _, name := range []string{"coding", "other"} {
+		if _, err := store.Create(name); err != nil {
+			t.Fatalf("create group %s: %v", name, err)
+		}
+	}
+	if _, err := store.Add("coding", "alpha"); err != nil {
+		t.Fatalf("add coding skill: %v", err)
+	}
+	if _, err := store.Add("other", "beta"); err != nil {
+		t.Fatalf("add other skill: %v", err)
+	}
+
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: disabledDir,
+		Groups:   groupsDir,
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+
+	view := model.viewGroupPanel()
+	if !strings.Contains(view, "● coding") {
+		t.Fatalf("active group marker missing:\n%s", view)
+	}
+	if strings.Contains(view, "● other") {
+		t.Fatalf("inactive group was marked active:\n%s", view)
+	}
+	if header := model.viewHeader(); !strings.Contains(header, "Using: ") || !strings.Contains(header, "● coding") {
+		t.Fatalf("active group header missing:\n%s", header)
+	}
+}
+
 func createSkill(t *testing.T, parent, id, name, description string) {
 	t.Helper()
 	dir := filepath.Join(parent, id)

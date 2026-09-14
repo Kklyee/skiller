@@ -63,6 +63,7 @@ type Model struct {
 
 	selectedGroup  string
 	selectedSkill  string
+	activeGroup    string
 	detailExpanded bool
 
 	search       string
@@ -177,6 +178,7 @@ func (m *Model) refresh() error {
 
 	m.skills = skills
 	m.groups = groups
+	m.activeGroup = findActiveGroup(groups, skills)
 	m.summary = catalog.Summarize(skills)
 	m.summary.ActiveDir = m.paths.Active
 	m.summary.DisabledDir = m.paths.Disabled
@@ -740,7 +742,7 @@ func (m *Model) viewHeader() string {
 		groupName = m.selectedGroup
 	}
 	header := fmt.Sprintf(
-		"Skiller  Installed %d  Active %d  Disabled %d  Conflict %d  Broken %d  Invalid %d  Group: %s",
+		"Skiller  Installed %d  Active %d  Disabled %d  Conflict %d  Broken %d  Invalid %d  Group: %s  Using: ",
 		m.summary.Installed,
 		m.summary.Active,
 		m.summary.Disabled,
@@ -749,13 +751,20 @@ func (m *Model) viewHeader() string {
 		m.summary.Invalid,
 		groupName,
 	)
-	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render(header)
+	if m.activeGroup == "" {
+		return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render(header) + helpTextStyle().Render("-")
+	}
+	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render(header) + stateStyle(catalog.StateActive).Render("● "+m.activeGroup)
 }
 
 func (m *Model) viewGroupPanel() string {
 	lines := []string{"All  " + fmt.Sprintf("%d", len(m.skills))}
 	for _, group := range m.groups {
-		lines = append(lines, fmt.Sprintf("%s  %d", group.Name, len(group.Skills)))
+		marker := "  "
+		if group.Name == m.activeGroup {
+			marker = stateStyle(catalog.StateActive).Render("●") + " "
+		}
+		lines = append(lines, fmt.Sprintf("%s%s  %d", marker, group.Name, len(group.Skills)))
 	}
 	selected := 0
 	if m.selectedGroup != "" {
@@ -774,6 +783,39 @@ func (m *Model) viewGroupPanel() string {
 		lines[index] = prefix + lines[index]
 	}
 	return strings.Join(lines, "\n")
+}
+
+func findActiveGroup(groups []group.Group, skills []catalog.Skill) string {
+	active := make(map[string]struct{})
+	for _, skill := range skills {
+		switch skill.State {
+		case catalog.StateActive:
+			active[skill.ID] = struct{}{}
+		case catalog.StateConflict, catalog.StateBroken, catalog.StateInvalid:
+			return ""
+		}
+	}
+
+	matches := make([]string, 0, 1)
+	for _, candidate := range groups {
+		if len(candidate.Missing) > 0 || len(candidate.Skills) != len(active) {
+			continue
+		}
+		matched := true
+		for _, id := range candidate.Skills {
+			if _, ok := active[id]; !ok {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			matches = append(matches, candidate.Name)
+		}
+	}
+	if len(matches) != 1 {
+		return ""
+	}
+	return matches[0]
 }
 
 func (m *Model) viewSkillsPanel() string {
