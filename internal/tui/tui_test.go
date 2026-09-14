@@ -456,6 +456,31 @@ func TestEditorSelectionStylesUseSemanticColors(t *testing.T) {
 	}
 }
 
+func TestFocusedPanelsHaveVisibleBorders(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: filepath.Join(root, "disabled"),
+		Groups:   filepath.Join(root, "groups"),
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(bubbletea.WindowSizeMsg{Width: 120, Height: 30})
+
+	if got := strings.Count(model.View(), "╭"); got != 1 {
+		t.Fatalf("groups focus border count = %d, want 1:\n%s", got, model.View())
+	}
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyTab})
+	if got := strings.Count(model.View(), "╭"); got != 1 {
+		t.Fatalf("skills focus border count = %d, want 1:\n%s", got, model.View())
+	}
+}
+
 func createSkill(t *testing.T, parent, id, name, description string) {
 	t.Helper()
 	dir := filepath.Join(parent, id)

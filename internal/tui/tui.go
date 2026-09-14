@@ -696,7 +696,7 @@ func (m *Model) mainColumns(columns []mainColumn, height int) string {
 	for _, column := range columns {
 		headers = append(headers, mainColumnHeader(column.title, column.width, column.focused))
 		rule = append(rule, lipgloss.NewStyle().Width(column.width).Foreground(lipgloss.Color("8")).Render(strings.Repeat("─", column.width)))
-		bodies = append(bodies, lipgloss.NewStyle().Width(column.width).Height(height).Render(column.content))
+		bodies = append(bodies, mainColumnBody(column, height))
 	}
 
 	return strings.Join([]string{
@@ -704,6 +704,26 @@ func (m *Model) mainColumns(columns []mainColumn, height int) string {
 		lipgloss.JoinHorizontal(lipgloss.Top, rule...),
 		lipgloss.JoinHorizontal(lipgloss.Top, bodies...),
 	}, "\n")
+}
+
+func mainColumnBody(column mainColumn, height int) string {
+	style := lipgloss.NewStyle().Width(column.width).Height(height)
+	if column.focused {
+		contentWidth := column.width - 2
+		if contentWidth < 1 {
+			contentWidth = 1
+		}
+		contentHeight := height - 2
+		if contentHeight < 1 {
+			contentHeight = 1
+		}
+		style = lipgloss.NewStyle().
+			Width(contentWidth).
+			Height(contentHeight).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("6"))
+	}
+	return style.Render(column.content)
 }
 
 func mainColumnHeader(title string, width int, focused bool) string {
@@ -795,7 +815,7 @@ func (m *Model) viewDetailsPanel() string {
 	lines := []string{
 		"Name: " + displayName(skill),
 		"Description: " + valueOrDash(skill.Description),
-		"Status: " + skill.State.String(),
+		"Status: " + stateStyle(skill.State).Render(skill.State.String()),
 		"Groups: " + strings.Join(groups, ", "),
 	}
 	return strings.Join(lines, "\n")
