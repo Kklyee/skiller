@@ -911,6 +911,43 @@ func (m *Model) viewMain() string {
 	}, "\n")
 }
 
+func (m *Model) mainPanelContentHeight() int {
+	height := m.height - 12
+	if height < 1 {
+		return 1
+	}
+	return height
+}
+
+func viewportBounds(total, selected, capacity int) (start, end int) {
+	if total == 0 {
+		return 0, 0
+	}
+	if capacity < 1 {
+		capacity = 1
+	}
+	if selected < 0 {
+		selected = 0
+	}
+	if selected >= total {
+		selected = total - 1
+	}
+	if capacity >= total {
+		return 0, total
+	}
+
+	start = selected - capacity + 1
+	if start < 0 {
+		start = 0
+	}
+	end = start + capacity
+	if end > total {
+		end = total
+		start = end - capacity
+	}
+	return start, end
+}
+
 func mainColumnWidths(width int) (groupWidth, skillsWidth, detailsWidth int) {
 	groupWidth = width / 5
 	if groupWidth < 22 {
@@ -950,6 +987,9 @@ func (m *Model) mainColumns(columns []mainColumn, height int) string {
 }
 
 func mainColumnBody(column mainColumn, height int) string {
+	if height < 3 {
+		height = 3
+	}
 	contentWidth := column.width - 2
 	if contentWidth < 1 {
 		contentWidth = 1
@@ -967,6 +1007,7 @@ func mainColumnBody(column mainColumn, height int) string {
 	style := lipgloss.NewStyle().
 		Width(contentWidth).
 		Height(contentHeight).
+		MaxHeight(height).
 		Border(border).
 		BorderForeground(borderColor)
 	return style.Render(column.content)
@@ -1036,7 +1077,8 @@ func (m *Model) viewGroupPanel() string {
 		}
 		lines[index] = prefix + lines[index]
 	}
-	return strings.Join(lines, "\n")
+	start, end := viewportBounds(len(lines), selected, m.mainPanelContentHeight())
+	return strings.Join(lines[start:end], "\n")
 }
 
 func allSkillsActive(skills []catalog.Skill) bool {
@@ -1087,14 +1129,24 @@ func findActiveGroup(groups []group.Group, skills []catalog.Skill) string {
 func (m *Model) viewSkillsPanel() string {
 	visible := m.visibleSkills()
 	lines := make([]string, 0, len(visible)+1)
+	contentHeight := m.mainPanelContentHeight()
 	if m.searchActive {
 		lines = append(lines, m.viewSearchBar(len(visible)))
+		contentHeight--
 	}
 	if len(visible) == 0 {
 		lines = append(lines, "No matching skills")
 		return strings.Join(lines, "\n")
 	}
-	for _, skill := range visible {
+	selected := 0
+	for index, skill := range visible {
+		if skill.ID == m.selectedSkill {
+			selected = index
+			break
+		}
+	}
+	start, end := viewportBounds(len(visible), selected, contentHeight)
+	for _, skill := range visible[start:end] {
 		lines = append(lines, skillRow(skill, skill.ID == m.selectedSkill))
 	}
 	return strings.Join(lines, "\n")
@@ -1590,7 +1642,7 @@ func (m *Model) panel(title, content string, width, height int, focused bool) st
 	if height < 3 {
 		height = 3
 	}
-	style := lipgloss.NewStyle().Width(width-2).Height(height-2).Padding(0, 1)
+	style := lipgloss.NewStyle().Width(width-2).Height(height-2).MaxHeight(height).Padding(0, 1)
 	if focused {
 		style = style.Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("6"))
 	} else {

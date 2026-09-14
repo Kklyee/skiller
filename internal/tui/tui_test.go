@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"image/color"
 	"os"
 	"path/filepath"
@@ -233,6 +234,64 @@ func TestMainPanelsReserveTheSameContentColumnAcrossFocus(t *testing.T) {
 	}
 	if got, want := contentColumn(focused), contentColumn(unfocused); got != want {
 		t.Fatalf("panel content moved between focus states: focused=%d unfocused=%d", got, want)
+	}
+}
+
+func TestMainColumnBodiesClipOverflowToFixedHeight(t *testing.T) {
+	content := strings.Join([]string{
+		"one",
+		"two",
+		"three",
+		"four",
+		"five",
+		"six",
+		"seven",
+		"eight",
+		"nine",
+		"ten",
+	}, "\n")
+	view := ansi.Strip(mainColumnBody(mainColumn{content: content, width: 30}, 8))
+
+	if got, want := lipgloss.Height(view), 8; got != want {
+		t.Fatalf("overflowing panel height = %d, want %d:\n%s", got, want, view)
+	}
+}
+
+func TestSkillsPanelScrollsSelectedSkillIntoView(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	for index := 0; index < 12; index++ {
+		id := fmt.Sprintf("skill-%02d", index)
+		createSkill(t, activeDir, id, id, "")
+	}
+
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: filepath.Join(root, "disabled"),
+		Groups:   filepath.Join(root, "groups"),
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(bubbletea.WindowSizeMsg{Width: 120, Height: 18})
+	model.Update(keyCode(bubbletea.KeyTab))
+
+	initial := ansi.Strip(model.viewSkillsPanel())
+	if !strings.Contains(initial, "skill-00") {
+		t.Fatalf("initial skill window does not start at first skill:\n%s", initial)
+	}
+
+	for index := 0; index < 11; index++ {
+		model.Update(keyCode(bubbletea.KeyDown))
+	}
+	scrolled := ansi.Strip(model.viewSkillsPanel())
+	if !strings.Contains(scrolled, "skill-11") {
+		t.Fatalf("scrolled skill window does not show selected skill:\n%s", scrolled)
+	}
+	if strings.Contains(scrolled, "skill-00") {
+		t.Fatalf("scrolled skill window still shows first skill:\n%s", scrolled)
 	}
 }
 
