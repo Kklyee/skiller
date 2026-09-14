@@ -60,7 +60,7 @@ func TestMainViewAndKeyboardInteractions(t *testing.T) {
 	}
 	model.Update(bubbletea.WindowSizeMsg{Width: 120, Height: 30})
 	view := viewText(&model)
-	for _, want := range []string{"Skiller", "alpha", "beta", "coding", "Details", "active", "disabled"} {
+	for _, want := range []string{"Skiller", "alpha", "beta", "coding", "Details", "Active", "Disabled"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("view missing %q:\n%s", want, view)
 		}
@@ -100,6 +100,45 @@ func TestMainViewAndKeyboardInteractions(t *testing.T) {
 	model.Update(keyText("g"))
 	if !strings.Contains(viewText(&model), "Skiller / Groups") {
 		t.Fatalf("groups screen missing:\n%s", viewText(&model))
+	}
+}
+
+func TestMainColumnWidthsConstrainLargePanels(t *testing.T) {
+	groupWidth, skillsWidth, detailsWidth := mainColumnWidths(180)
+	if groupWidth != 30 || skillsWidth != 60 || detailsWidth != 90 {
+		t.Fatalf("large layout widths = %d, %d, %d; want 30, 60, 90", groupWidth, skillsWidth, detailsWidth)
+	}
+
+	groupWidth, skillsWidth, detailsWidth = mainColumnWidths(90)
+	if groupWidth != 22 || skillsWidth != 30 || detailsWidth != 38 {
+		t.Fatalf("medium layout widths = %d, %d, %d; want 22, 30, 38", groupWidth, skillsWidth, detailsWidth)
+	}
+}
+
+func TestSkillRowsUseIconsWithoutRepeatedStateLabels(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+	createSkill(t, disabledDir, "beta", "Beta", "Second skill")
+
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: disabledDir,
+		Groups:   filepath.Join(root, "groups"),
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+
+	view := ansi.Strip(model.viewSkillsPanel())
+	if !strings.Contains(view, "● Alpha [alpha]") || !strings.Contains(view, "○ Beta [beta]") {
+		t.Fatalf("skill rows missing state icons:\n%s", view)
+	}
+	if strings.Contains(view, "active") || strings.Contains(view, "disabled") {
+		t.Fatalf("skill rows repeat state labels:\n%s", view)
 	}
 }
 

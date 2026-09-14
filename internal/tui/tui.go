@@ -715,15 +715,7 @@ func (m *Model) viewMain() string {
 		bodyHeight = 3
 	}
 
-	groupWidth := m.width / 4
-	if groupWidth < 22 {
-		groupWidth = 22
-	}
-	skillsWidth := m.width * 3 / 8
-	if skillsWidth < 30 {
-		skillsWidth = 30
-	}
-	detailsWidth := m.width - groupWidth - skillsWidth
+	groupWidth, skillsWidth, detailsWidth := mainColumnWidths(m.width)
 	showDetails := detailsWidth >= 24 && m.width >= 90
 	if showDetails {
 		return strings.Join([]string{
@@ -753,6 +745,27 @@ func (m *Model) viewMain() string {
 		}, bodyHeight),
 		m.viewFooter(),
 	}, "\n")
+}
+
+func mainColumnWidths(width int) (groupWidth, skillsWidth, detailsWidth int) {
+	groupWidth = width / 5
+	if groupWidth < 22 {
+		groupWidth = 22
+	}
+	if groupWidth > 30 {
+		groupWidth = 30
+	}
+
+	skillsWidth = width / 3
+	if skillsWidth < 30 {
+		skillsWidth = 30
+	}
+	if skillsWidth > 60 {
+		skillsWidth = 60
+	}
+
+	detailsWidth = width - groupWidth - skillsWidth
+	return groupWidth, skillsWidth, detailsWidth
 }
 
 func (m *Model) mainColumns(columns []mainColumn, height int) string {
@@ -805,15 +818,23 @@ func (m *Model) viewHeader() string {
 	if m.selectedGroup != "" {
 		groupName = m.selectedGroup
 	}
-	header := fmt.Sprintf(
-		"Skiller  Installed %d  Active %d  Disabled %d  Conflict %d  Group: %s",
-		m.summary.Installed,
-		m.summary.Active,
-		m.summary.Disabled,
-		m.summary.Conflict,
-		groupName,
-	)
-	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render(header)
+	parts := []string{
+		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller"),
+		headerMetric("Installed", m.summary.Installed, "6"),
+		headerMetric("Active", m.summary.Active, "10"),
+		headerMetric("Disabled", m.summary.Disabled, "8"),
+		headerMetric("Conflict", m.summary.Conflict, "9"),
+		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Group: " + groupName),
+	}
+	return strings.Join(parts, "  ")
+}
+
+func headerMetric(label string, value int, color string) string {
+	style := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(color))
+	if value == 0 && label != "Installed" {
+		style = style.Foreground(lipgloss.Color("8"))
+	}
+	return style.Render(fmt.Sprintf("%s %d", label, value))
 }
 
 func (m *Model) viewGroupPanel() string {
@@ -1234,8 +1255,7 @@ func stateLine(skill catalog.Skill) string {
 	if name != skill.ID {
 		name = fmt.Sprintf("%s [%s]", name, skill.ID)
 	}
-	badge := stateStyle(skill.State).Render(fmt.Sprintf("%s %s", stateIcon(skill.State), skill.State))
-	return fmt.Sprintf("%s %s", badge, name)
+	return fmt.Sprintf("%s %s", stateStyle(skill.State).Render(stateIcon(skill.State)), name)
 }
 
 func stateStyle(state catalog.State) lipgloss.Style {
