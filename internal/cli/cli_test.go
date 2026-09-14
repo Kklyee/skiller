@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 func TestRootCommandRejectsUnfinishedJournal(t *testing.T) {
@@ -43,5 +45,29 @@ func TestRootVersionFlag(t *testing.T) {
 	}
 	if !strings.Contains(output.String(), "skiller version dev") {
 		t.Fatalf("version output: %q", output.String())
+	}
+}
+
+func TestHelpPaletteUsesSemanticColors(t *testing.T) {
+	palette := newHelpPalette(&bytes.Buffer{})
+	want := map[string]lipgloss.TerminalColor{
+		"heading":  lipgloss.Color("6"),
+		"command":  lipgloss.Color("10"),
+		"argument": lipgloss.Color("11"),
+		"flag":     lipgloss.Color("13"),
+		"hint":     lipgloss.Color("8"),
+	}
+
+	got := map[string]lipgloss.TerminalColor{
+		"heading":  palette.heading.GetForeground(),
+		"command":  palette.command.GetForeground(),
+		"argument": palette.argument.GetForeground(),
+		"flag":     palette.flag.GetForeground(),
+		"hint":     palette.hint.GetForeground(),
+	}
+	for name, wantColor := range want {
+		if got[name] != wantColor {
+			t.Fatalf("help %s color = %v, want %v", name, got[name], wantColor)
+		}
 	}
 }

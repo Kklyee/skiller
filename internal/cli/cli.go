@@ -42,6 +42,7 @@ func NewRootCommand() *cobra.Command {
 			return nil
 		},
 	}
+	configureHelp(cmd)
 
 	cmd.AddCommand(
 		command.NewList(),

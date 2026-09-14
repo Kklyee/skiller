@@ -923,22 +923,34 @@ func (m *Model) viewDoctor() string {
 
 func (m *Model) viewHelp() string {
 	lines := []string{
-		"↑/k and ↓/j  move selection",
-		"tab          switch panel focus",
-		"space        toggle selected skill",
-		"/            search by ID, metadata, or group",
-		"g            group management",
-		"u            preview and apply selected group",
-		"enter        expand details",
-		"d            doctor/status",
-		"esc          close or go back",
-		"q            quit",
+		helpLine("↑/k ↓/j", "move selection"),
+		helpLine("tab", "switch panel focus"),
+		helpLine("space", "toggle selected skill"),
+		helpLine("/", "search by ID, metadata, or group"),
+		helpLine("g", "group management"),
+		helpLine("u", "preview and apply selected group"),
+		helpLine("enter", "expand details"),
+		helpLine("d", "doctor/status"),
+		helpLine("esc", "close or go back"),
+		helpLine("q", "quit"),
 	}
 	return strings.Join([]string{
 		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Help"),
 		m.panel("Keyboard", strings.Join(lines, "\n"), m.width, m.height-3, true),
 		"esc back",
 	}, "\n")
+}
+
+func helpLine(key, description string) string {
+	return fmt.Sprintf("  %s %s", helpKeyStyle().Render(fmt.Sprintf("%-12s", key)), helpTextStyle().Render(description))
+}
+
+func helpKeyStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("11"))
+}
+
+func helpTextStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 }
 
 func (m *Model) panel(title, content string, width, height int, focused bool) string {

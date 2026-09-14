@@ -325,6 +325,15 @@ func TestMainLayoutUsesSingleTableHeader(t *testing.T) {
 	}
 }
 
+func TestHelpViewUsesSemanticStyles(t *testing.T) {
+	if got, want := helpKeyStyle().GetForeground(), lipgloss.Color("11"); got != want {
+		t.Fatalf("help key color = %v, want %v", got, want)
+	}
+	if got, want := helpTextStyle().GetForeground(), lipgloss.Color("8"); got != want {
+		t.Fatalf("help text color = %v, want %v", got, want)
+	}
+}
+
 func createSkill(t *testing.T, parent, id, name, description string) {
 	t.Helper()
 	dir := filepath.Join(parent, id)
