@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  go:
+    name: Go checks (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: go fmt
+        shell: bash
+        run: |
+          go fmt ./...
+          git diff --exit-code
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test ./...
