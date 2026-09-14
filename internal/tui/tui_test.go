@@ -84,6 +84,83 @@ func TestMainViewAndKeyboardInteractions(t *testing.T) {
 	}
 }
 
+func TestSpaceOnlyTogglesSkillsWhenSkillsFocused(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+	createSkill(t, disabledDir, "beta", "Beta", "Second skill")
+
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: disabledDir,
+		Groups:   filepath.Join(root, "groups"),
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{' '}})
+	skills, err := scanForTest(activeDir, disabledDir)
+	if err != nil {
+		t.Fatalf("scan after groups-focused space: %v", err)
+	}
+	if skills[0].State != catalog.StateActive {
+		t.Fatalf("groups-focused space changed alpha to %s", skills[0].State)
+	}
+
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyTab})
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{' '}})
+	skills, err = scanForTest(activeDir, disabledDir)
+	if err != nil {
+		t.Fatalf("scan after skills-focused space: %v", err)
+	}
+	if skills[0].State != catalog.StateDisabled {
+		t.Fatalf("skills-focused space did not toggle alpha: %s", skills[0].State)
+	}
+}
+
+func TestGroupFocusEnterOpensGroupsPage(t *testing.T) {
+	root := t.TempDir()
+	groupsDir := filepath.Join(root, "groups")
+	if _, err := group.New(groupsDir).Create("coding"); err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+
+	model, err := NewModel(paths.Set{
+		Active:   filepath.Join(root, "active"),
+		Disabled: filepath.Join(root, "disabled"),
+		Groups:   groupsDir,
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyDown})
+	footer := model.viewFooter()
+	if strings.Contains(footer, "space toggle") {
+		t.Fatalf("groups footer advertises skill toggle:\n%s", footer)
+	}
+	if !strings.Contains(footer, "enter groups") {
+		t.Fatalf("groups footer missing groups action:\n%s", footer)
+	}
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEnter})
+
+	if model.screen != ScreenGroups {
+		t.Fatalf("screen after groups-focused enter = %v, want groups", model.screen)
+	}
+	if model.detailExpanded {
+		t.Fatal("groups-focused enter expanded skill details")
+	}
+	if !strings.Contains(model.View(), "Skiller / Groups") {
+		t.Fatalf("groups page missing after enter:\n%s", model.View())
+	}
+}
+
 func TestConflictFromExternalInstallerIsVisible(t *testing.T) {
 	root := t.TempDir()
 	activeDir := filepath.Join(root, "active")
@@ -169,6 +246,7 @@ func TestResponsiveDetailsAndMinimumSize(t *testing.T) {
 		t.Fatalf("new model: %v", err)
 	}
 	model.Update(bubbletea.WindowSizeMsg{Width: 70, Height: 20})
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyTab})
 	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEnter})
 	if !strings.Contains(model.View(), "Description") {
 		t.Fatalf("expanded details missing:\n%s", model.View())

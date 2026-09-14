@@ -227,12 +227,20 @@ func (m *Model) updateKey(message bubbletea.KeyMsg) bubbletea.Cmd {
 	case "down", "j":
 		m.moveSelection(1)
 	case " ":
-		m.toggleSelectedSkill()
+		if m.focus == FocusSkills {
+			m.toggleSelectedSkill()
+		}
 	case "/":
 		m.searchActive = true
 		m.search = ""
 	case "enter":
-		m.detailExpanded = true
+		if m.focus == FocusGroups {
+			m.screen = ScreenGroups
+			m.detailExpanded = false
+			m.clearMessage()
+		} else {
+			m.detailExpanded = true
+		}
 	case "esc":
 		m.detailExpanded = false
 		m.focus = FocusSkills
@@ -898,15 +906,25 @@ func (m *Model) viewFooter() string {
 	hints := []keyHint{
 		{key: "↑↓/jk", description: "move"},
 		{key: "tab", description: "focus"},
-		{key: "space", description: "toggle"},
-		{key: "/", description: "search"},
-		{key: "g", description: "groups"},
-		{key: "u", description: "use"},
-		{key: "enter", description: "details"},
-		{key: "d", description: "doctor"},
-		{key: "?", description: "help"},
-		{key: "q", description: "quit"},
 	}
+	if m.focus == FocusSkills {
+		hints = append(hints, keyHint{key: "space", description: "toggle"})
+	}
+	hints = append(hints,
+		keyHint{key: "/", description: "search"},
+		keyHint{key: "g", description: "groups"},
+		keyHint{key: "u", description: "use"},
+	)
+	if m.focus == FocusGroups {
+		hints = append(hints, keyHint{key: "enter", description: "groups"})
+	} else {
+		hints = append(hints, keyHint{key: "enter", description: "details"})
+	}
+	hints = append(hints,
+		keyHint{key: "d", description: "doctor"},
+		keyHint{key: "?", description: "help"},
+		keyHint{key: "q", description: "quit"},
+	)
 	if m.searchActive {
 		hints = []keyHint{
 			{key: "type", description: "filter"},
