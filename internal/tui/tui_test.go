@@ -291,6 +291,40 @@ func TestCreatingGroupOpensSkillSelector(t *testing.T) {
 	}
 }
 
+func TestMainLayoutUsesSingleTableHeader(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: filepath.Join(root, "disabled"),
+		Groups:   filepath.Join(root, "groups"),
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(bubbletea.WindowSizeMsg{Width: 120, Height: 30})
+
+	var header string
+	for _, line := range strings.Split(model.View(), "\n") {
+		if strings.Contains(line, "Groups") && strings.Contains(line, "Skills") && strings.Contains(line, "Details") {
+			header = line
+			break
+		}
+	}
+	if header == "" {
+		t.Fatalf("single table header is missing:\n%s", model.View())
+	}
+	for _, border := range []string{"╭", "╮", "╰", "╯", "│"} {
+		if strings.Contains(header, border) {
+			t.Fatalf("table header contains panel border %q: %s", border, header)
+		}
+	}
+}
+
 func createSkill(t *testing.T, parent, id, name, description string) {
 	t.Helper()
 	dir := filepath.Join(parent, id)

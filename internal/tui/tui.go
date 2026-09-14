@@ -76,6 +76,13 @@ type Model struct {
 	height       int
 }
 
+type mainColumn struct {
+	title   string
+	content string
+	width   int
+	focused bool
+}
+
 func NewModel(pathSet paths.Set) (Model, error) {
 	model := Model{
 		paths:  pathSet,
@@ -618,7 +625,7 @@ func (m *Model) openDeleteGroup() {
 
 func (m *Model) viewMain() string {
 	header := m.viewHeader()
-	bodyHeight := m.height - 5
+	bodyHeight := m.height - 7
 	if bodyHeight < 3 {
 		bodyHeight = 3
 	}
@@ -634,27 +641,58 @@ func (m *Model) viewMain() string {
 	detailsWidth := m.width - groupWidth - skillsWidth
 	showDetails := detailsWidth >= 24 && m.width >= 90
 	if showDetails {
-		panels := []string{
-			m.panel("Groups", m.viewGroupPanel(), groupWidth, bodyHeight, m.focus == FocusGroups),
-			m.panel("Skills", m.viewSkillsPanel(), skillsWidth, bodyHeight, m.focus == FocusSkills),
-			m.panel("Details", m.viewDetailsPanel(), detailsWidth, bodyHeight, false),
-		}
-		return strings.Join([]string{header, lipgloss.JoinHorizontal(lipgloss.Top, panels...), m.viewFooter()}, "\n")
+		return strings.Join([]string{
+			header,
+			m.mainColumns([]mainColumn{
+				{title: "Groups", content: m.viewGroupPanel(), width: groupWidth, focused: m.focus == FocusGroups},
+				{title: "Skills", content: m.viewSkillsPanel(), width: skillsWidth, focused: m.focus == FocusSkills},
+				{title: "Details", content: m.viewDetailsPanel(), width: detailsWidth},
+			}, bodyHeight),
+			m.viewFooter(),
+		}, "\n")
 	}
 	if m.detailExpanded {
-		return strings.Join([]string{header, m.panel("Details", m.viewDetailsPanel(), m.width, bodyHeight, false), m.viewFooter()}, "\n")
+		return strings.Join([]string{
+			header,
+			m.mainColumns([]mainColumn{{title: "Details", content: m.viewDetailsPanel(), width: m.width}}, bodyHeight),
+			m.viewFooter(),
+		}, "\n")
 	}
 
 	usableSkillsWidth := m.width - groupWidth
 	return strings.Join([]string{
 		header,
-		lipgloss.JoinHorizontal(
-			lipgloss.Top,
-			m.panel("Groups", m.viewGroupPanel(), groupWidth, bodyHeight, m.focus == FocusGroups),
-			m.panel("Skills", m.viewSkillsPanel(), usableSkillsWidth, bodyHeight, m.focus == FocusSkills),
-		),
+		m.mainColumns([]mainColumn{
+			{title: "Groups", content: m.viewGroupPanel(), width: groupWidth, focused: m.focus == FocusGroups},
+			{title: "Skills", content: m.viewSkillsPanel(), width: usableSkillsWidth, focused: m.focus == FocusSkills},
+		}, bodyHeight),
 		m.viewFooter(),
 	}, "\n")
+}
+
+func (m *Model) mainColumns(columns []mainColumn, height int) string {
+	headers := make([]string, 0, len(columns))
+	rule := make([]string, 0, len(columns))
+	bodies := make([]string, 0, len(columns))
+	for _, column := range columns {
+		headers = append(headers, mainColumnHeader(column.title, column.width, column.focused))
+		rule = append(rule, lipgloss.NewStyle().Width(column.width).Foreground(lipgloss.Color("8")).Render(strings.Repeat("─", column.width)))
+		bodies = append(bodies, lipgloss.NewStyle().Width(column.width).Height(height).Render(column.content))
+	}
+
+	return strings.Join([]string{
+		lipgloss.JoinHorizontal(lipgloss.Top, headers...),
+		lipgloss.JoinHorizontal(lipgloss.Top, rule...),
+		lipgloss.JoinHorizontal(lipgloss.Top, bodies...),
+	}, "\n")
+}
+
+func mainColumnHeader(title string, width int, focused bool) string {
+	style := lipgloss.NewStyle().Width(width).Bold(true).Foreground(lipgloss.Color("8"))
+	if focused {
+		style = style.Foreground(lipgloss.Color("6")).Underline(true)
+	}
+	return style.Render(title)
 }
 
 func (m *Model) viewHeader() string {
