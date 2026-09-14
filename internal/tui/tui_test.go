@@ -504,9 +504,12 @@ func TestAllVirtualGroupCanBeUsedAndMarked(t *testing.T) {
 	if !strings.Contains(view, "● All") {
 		t.Fatalf("All group marker missing after using All:\n%s", view)
 	}
+	if strings.Contains(view, "Using All") {
+		t.Fatalf("All status text should not be rendered:\n%s", view)
+	}
 }
 
-func TestGroupPanelExplainsUnmatchedActiveSkills(t *testing.T) {
+func TestGroupPanelKeepsSelectionWithoutStatusLine(t *testing.T) {
 	root := t.TempDir()
 	activeDir := filepath.Join(root, "active")
 	disabledDir := filepath.Join(root, "disabled")
@@ -536,8 +539,14 @@ func TestGroupPanelExplainsUnmatchedActiveSkills(t *testing.T) {
 	if !strings.Contains(view, "›   hello") {
 		t.Fatalf("selected hello group missing:\n%s", view)
 	}
-	if !strings.Contains(view, "No group applied") {
-		t.Fatalf("unmatched active skills are not explained:\n%s", view)
+	if strings.Contains(view, "No group applied") || strings.Contains(view, "Using ") {
+		t.Fatalf("group panel contains an extra status line:\n%s", view)
+	}
+}
+
+func TestGroupNamesUseActiveGreen(t *testing.T) {
+	if got, want := groupNameStyle().GetForeground(), lipgloss.Color("10"); got != want {
+		t.Fatalf("group name color = %v, want %v", got, want)
 	}
 }
 

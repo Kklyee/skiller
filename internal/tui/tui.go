@@ -981,13 +981,13 @@ func (m *Model) viewGroupPanel() string {
 	if allSkillsActive(m.skills) {
 		allMarker = stateStyle(catalog.StateActive).Render("●") + " "
 	}
-	lines := []string{allMarker + "All  " + fmt.Sprintf("%d", len(m.skills))}
+	lines := []string{allMarker + groupNameStyle().Render("All") + "  " + fmt.Sprintf("%d", len(m.skills))}
 	for _, group := range m.groups {
 		marker := "  "
 		if group.Name == m.activeGroup {
 			marker = stateStyle(catalog.StateActive).Render("●") + " "
 		}
-		lines = append(lines, fmt.Sprintf("%s%s  %d", marker, group.Name, len(group.Skills)))
+		lines = append(lines, fmt.Sprintf("%s%s  %d", marker, groupNameStyle().Render(group.Name), len(group.Skills)))
 	}
 	selected := 0
 	if m.selectedGroup != "" {
@@ -1005,18 +1005,7 @@ func (m *Model) viewGroupPanel() string {
 		}
 		lines[index] = prefix + lines[index]
 	}
-	lines = append(lines, "", m.groupStatusLine())
 	return strings.Join(lines, "\n")
-}
-
-func (m *Model) groupStatusLine() string {
-	if allSkillsActive(m.skills) {
-		return stateStyle(catalog.StateActive).Render("● Using All")
-	}
-	if m.activeGroup != "" {
-		return stateStyle(catalog.StateActive).Render("● Using " + m.activeGroup)
-	}
-	return helpTextStyle().Render("○ No group applied")
 }
 
 func allSkillsActive(skills []catalog.Skill) bool {
@@ -1250,9 +1239,9 @@ func (m *Model) viewGroupManagerList() string {
 		if group.Name == m.activeGroup {
 			marker = stateStyle(catalog.StateActive).Render("●") + " "
 		}
-		name := group.Name
+		name := groupNameStyle().Render(group.Name)
 		if group.Name == m.selectedGroup {
-			name = selectedRowStyle().Render(name)
+			name = groupNameStyle().Bold(true).Render(group.Name)
 		}
 		lines = append(lines, prefix+marker+name+fmt.Sprintf("  %d", len(group.Skills)))
 		if len(group.Missing) > 0 {
@@ -1557,6 +1546,10 @@ func editorCursorStyle() lipgloss.Style {
 
 func selectedRowStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6"))
+}
+
+func groupNameStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
 }
 
 func (m *Model) panel(title, content string, width, height int, focused bool) string {
