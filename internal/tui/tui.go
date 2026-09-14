@@ -921,13 +921,13 @@ func (m *Model) viewGroups() string {
 func (m *Model) viewGroupEditor() string {
 	lines := []string{"Edit Group: " + m.editorGroup.Name, ""}
 	for index, id := range m.editorSkills {
-		mark := "[ ]"
+		mark := editorUnselectedStyle().Render("[ ]")
 		if m.editorChosen[id] {
-			mark = "[x]"
+			mark = editorSelectedStyle().Render("[x]")
 		}
 		prefix := "  "
 		if index == m.editorIndex {
-			prefix = "> "
+			prefix = editorCursorStyle().Render("> ")
 		}
 		lines = append(lines, prefix+mark+" "+id)
 	}
@@ -973,28 +973,28 @@ func (m *Model) viewGroupDetails() string {
 }
 
 func (m *Model) viewReconcileModal() string {
-	lines := []string{"Activate Group: " + m.plan.Group, "", "Enable"}
+	lines := []string{"Activate Group: " + m.plan.Group, "", messageStyle(messageSuccess).Render("Enable")}
 	for _, id := range m.plan.Enable {
-		lines = append(lines, "  + "+id)
+		lines = append(lines, messageStyle(messageSuccess).Render("  +")+" "+id)
 	}
-	lines = append(lines, "Disable")
+	lines = append(lines, messageStyle(messageError).Render("Disable"))
 	for _, id := range m.plan.Disable {
-		lines = append(lines, "  - "+id)
+		lines = append(lines, messageStyle(messageError).Render("  -")+" "+id)
 	}
-	lines = append(lines, "Keep")
+	lines = append(lines, messageStyle(messageInfo).Render("Keep"))
 	for _, id := range m.plan.Keep {
-		lines = append(lines, "  = "+id)
+		lines = append(lines, helpTextStyle().Render("  =")+" "+id)
 	}
 	if len(m.plan.Missing) > 0 {
-		lines = append(lines, "Missing")
+		lines = append(lines, messageStyle(messageInfo).Render("Missing"))
 		for _, id := range m.plan.Missing {
-			lines = append(lines, "  ? "+id)
+			lines = append(lines, messageStyle(messageInfo).Render("  ?")+" "+id)
 		}
 	}
 	if len(m.plan.Issues) > 0 {
-		lines = append(lines, "Issues")
+		lines = append(lines, messageStyle(messageError).Render("Issues"))
 		for _, issue := range m.plan.Issues {
-			lines = append(lines, "  ! "+issue)
+			lines = append(lines, messageStyle(messageError).Render("  !")+" "+issue)
 		}
 	}
 	lines = append(lines, "", fmt.Sprintf("%d enable  %d disable  %d unchanged", len(m.plan.Enable), len(m.plan.Disable), len(m.plan.Keep)))
@@ -1063,6 +1063,18 @@ func helpKeyStyle() lipgloss.Style {
 
 func helpTextStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+}
+
+func editorSelectedStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10"))
+}
+
+func editorUnselectedStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+}
+
+func editorCursorStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6"))
 }
 
 func (m *Model) panel(title, content string, width, height int, focused bool) string {

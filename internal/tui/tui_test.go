@@ -438,6 +438,24 @@ func TestMessageStylesUseSemanticColors(t *testing.T) {
 	}
 }
 
+func TestEditorSelectionStylesUseSemanticColors(t *testing.T) {
+	want := map[string]lipgloss.TerminalColor{
+		"selected":   lipgloss.Color("10"),
+		"unselected": lipgloss.Color("8"),
+		"cursor":     lipgloss.Color("6"),
+	}
+	got := map[string]lipgloss.TerminalColor{
+		"selected":   editorSelectedStyle().GetForeground(),
+		"unselected": editorUnselectedStyle().GetForeground(),
+		"cursor":     editorCursorStyle().GetForeground(),
+	}
+	for name, wantColor := range want {
+		if got[name] != wantColor {
+			t.Fatalf("editor %s color = %v, want %v", name, got[name], wantColor)
+		}
+	}
+}
+
 func createSkill(t *testing.T, parent, id, name, description string) {
 	t.Helper()
 	dir := filepath.Join(parent, id)
