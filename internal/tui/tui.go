@@ -16,6 +16,7 @@ import (
 	"github.com/Kklyee/skiller/internal/reconcile"
 	"github.com/Kklyee/skiller/internal/transaction"
 	"github.com/Kklyee/skiller/internal/visibility"
+	"github.com/charmbracelet/x/term"
 )
 
 type Screen uint8
@@ -106,8 +107,15 @@ type keyHint struct {
 
 type startupTickMsg struct{}
 
+type resizePollMsg struct {
+	width  int
+	height int
+	valid  bool
+}
+
 const startupFrameCount = 4
 const startupFrameInterval = 160 * time.Millisecond
+const resizePollInterval = 250 * time.Millisecond
 const allGroupName = "All"
 
 func NewModel(pathSet paths.Set) (Model, error) {
@@ -139,25 +147,23 @@ func Run(pathSet paths.Set) error {
 }
 
 func (m *Model) Init() bubbletea.Cmd {
-	return nil
+	return m.resizePoll()
 }
 
 func (m *Model) Update(message bubbletea.Msg) (bubbletea.Model, bubbletea.Cmd) {
 	switch message := message.(type) {
 	case bubbletea.WindowSizeMsg:
-		m.width = message.Width
-		m.height = message.Height
-		if m.startupPending {
-			m.startupPending = false
-			if m.width >= 60 && m.height >= 8 {
-				m.startupActive = true
-				m.startupFrame = 0
-				return m, m.startupTick()
-			}
+		return m, m.applyWindowSize(message.Width, message.Height)
+	case resizePollMsg:
+		resizeCmd := bubbletea.Cmd(nil)
+		if message.valid {
+			resizeCmd = m.applyWindowSize(message.width, message.height)
 		}
-		if m.startupActive && (m.width < 60 || m.height < 8) {
-			m.finishStartup()
+		pollCmd := m.resizePoll()
+		if resizeCmd == nil {
+			return m, pollCmd
 		}
+		return m, bubbletea.Batch(resizeCmd, pollCmd)
 	case startupTickMsg:
 		if !m.startupActive {
 			return m, nil
@@ -177,6 +183,36 @@ func (m *Model) Update(message bubbletea.Msg) (bubbletea.Model, bubbletea.Cmd) {
 	}
 
 	return m, nil
+}
+
+func (m *Model) applyWindowSize(width, height int) bubbletea.Cmd {
+	if width <= 0 || height <= 0 {
+		return nil
+	}
+	m.width = width
+	m.height = height
+	if m.startupPending {
+		m.startupPending = false
+		if m.width >= 60 && m.height >= 8 {
+			m.startupActive = true
+			m.startupFrame = 0
+			return m.startupTick()
+		}
+	}
+	if m.startupActive && (m.width < 60 || m.height < 8) {
+		m.finishStartup()
+	}
+	return nil
+}
+
+func (m *Model) resizePoll() bubbletea.Cmd {
+	return bubbletea.Tick(resizePollInterval, func(time.Time) bubbletea.Msg {
+		width, height, err := term.GetSize(os.Stdout.Fd())
+		if err != nil {
+			return resizePollMsg{}
+		}
+		return resizePollMsg{width: width, height: height, valid: true}
+	})
 }
 
 func (m *Model) View() bubbletea.View {

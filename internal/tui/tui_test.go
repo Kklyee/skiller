@@ -105,6 +105,44 @@ func TestMainViewAndKeyboardInteractions(t *testing.T) {
 	}
 }
 
+func TestInitStartsTerminalResizePolling(t *testing.T) {
+	root := t.TempDir()
+	model, err := NewModel(paths.Set{
+		Active:   filepath.Join(root, "active"),
+		Disabled: filepath.Join(root, "disabled"),
+		Groups:   filepath.Join(root, "groups"),
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	if model.Init() == nil {
+		t.Fatal("Init returned no terminal resize polling command")
+	}
+}
+
+func TestResizePollUpdatesModelSize(t *testing.T) {
+	root := t.TempDir()
+	model, err := NewModel(paths.Set{
+		Active:   filepath.Join(root, "active"),
+		Disabled: filepath.Join(root, "disabled"),
+		Groups:   filepath.Join(root, "groups"),
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+
+	model.Update(bubbletea.WindowSizeMsg{Width: 80, Height: 20})
+	model.Update(resizePollMsg{width: 160, height: 40, valid: true})
+
+	if model.width != 160 || model.height != 40 {
+		t.Fatalf("model size after resize poll = %dx%d, want 160x40", model.width, model.height)
+	}
+}
+
 func TestStartupLogoAnimationProgressesAndCanBeSkipped(t *testing.T) {
 	t.Setenv("NO_COLOR", "")
 	t.Setenv("TERM", "xterm")
