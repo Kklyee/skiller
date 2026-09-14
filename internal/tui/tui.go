@@ -1018,17 +1018,32 @@ func findActiveGroup(groups []group.Group, skills []catalog.Skill) string {
 
 func (m *Model) viewSkillsPanel() string {
 	visible := m.visibleSkills()
-	if len(visible) == 0 {
-		return "No matching skills"
+	lines := make([]string, 0, len(visible)+1)
+	if m.searchActive {
+		lines = append(lines, m.viewSearchBar(len(visible)))
 	}
-	lines := make([]string, 0, len(visible))
+	if len(visible) == 0 {
+		lines = append(lines, "No matching skills")
+		return strings.Join(lines, "\n")
+	}
 	for _, skill := range visible {
 		lines = append(lines, skillRow(skill, skill.ID == m.selectedSkill))
 	}
-	if m.searchActive {
-		lines = append([]string{"Search: " + m.search}, lines...)
-	}
 	return strings.Join(lines, "\n")
+}
+
+func (m *Model) viewSearchBar(matches int) string {
+	query := m.search
+	queryStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("7"))
+	if query == "" {
+		query = "type to filter"
+		queryStyle = helpTextStyle()
+	}
+	label := "matches"
+	if matches == 1 {
+		label = "match"
+	}
+	return selectedRowStyle().Render("/") + " " + queryStyle.Render(query+"▌") + " " + helpTextStyle().Render(fmt.Sprintf("(%d %s)", matches, label))
 }
 
 func (m *Model) viewDetailsPanel() string {

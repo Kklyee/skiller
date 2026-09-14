@@ -221,6 +221,35 @@ func TestSelectedRowUsesBrandHighlight(t *testing.T) {
 	}
 }
 
+func TestSearchBarShowsQueryAndMatchCount(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+	createSkill(t, disabledDir, "beta", "Beta", "Second skill")
+
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: disabledDir,
+		Groups:   filepath.Join(root, "groups"),
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(keyText("/"))
+	if view := ansi.Strip(model.viewSkillsPanel()); !strings.Contains(view, "type to filter") || !strings.Contains(view, "2 matches") {
+		t.Fatalf("empty search bar is unclear:\n%s", view)
+	}
+
+	model.Update(keyText("beta"))
+	view := ansi.Strip(model.viewSkillsPanel())
+	if !strings.Contains(view, "/ beta") || !strings.Contains(view, "1 match") {
+		t.Fatalf("active search bar is missing query or count:\n%s", view)
+	}
+}
+
 func TestSpaceOnlyTogglesSkillsWhenSkillsFocused(t *testing.T) {
 	root := t.TempDir()
 	activeDir := filepath.Join(root, "active")
