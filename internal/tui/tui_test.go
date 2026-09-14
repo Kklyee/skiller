@@ -631,6 +631,44 @@ func TestGroupsPageShowsManagerColumnsAndUseAction(t *testing.T) {
 	}
 }
 
+func TestGroupsPageSelectsFirstGroupAndKeepsSelectionAtTop(t *testing.T) {
+	root := t.TempDir()
+	groupsDir := filepath.Join(root, "groups")
+	store := group.New(groupsDir)
+	for _, name := range []string{"hello", "test"} {
+		if _, err := store.Create(name); err != nil {
+			t.Fatalf("create group %s: %v", name, err)
+		}
+	}
+
+	model, err := NewModel(paths.Set{
+		Active:   filepath.Join(root, "active"),
+		Disabled: filepath.Join(root, "disabled"),
+		Groups:   groupsDir,
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+
+	model.Update(keyText("g"))
+	if model.screen != ScreenGroups {
+		t.Fatalf("screen after opening groups = %v, want groups", model.screen)
+	}
+	if model.selectedGroup != "hello" {
+		t.Fatalf("selected group after opening groups = %q, want hello", model.selectedGroup)
+	}
+	if strings.Contains(viewText(&model), "Select a group to inspect its members") {
+		t.Fatalf("groups page opened without a selected group:\n%s", viewText(&model))
+	}
+
+	model.Update(keyCode(bubbletea.KeyUp))
+	if model.selectedGroup != "hello" {
+		t.Fatalf("selected group after moving above first group = %q, want hello", model.selectedGroup)
+	}
+}
+
 func TestConflictFromExternalInstallerIsVisible(t *testing.T) {
 	root := t.TempDir()
 	activeDir := filepath.Join(root, "active")

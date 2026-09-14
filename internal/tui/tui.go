@@ -313,6 +313,7 @@ func (m *Model) refresh() error {
 	m.summary.DisabledDir = m.paths.Disabled
 	m.selectedGroup = previousGroup
 	m.selectedSkill = previousSkill
+	m.normalizeGroupSelection()
 	m.normalizeSelection()
 
 	return nil
@@ -368,9 +369,7 @@ func (m *Model) updateKey(message bubbletea.KeyPressMsg) bubbletea.Cmd {
 		m.search = ""
 	case "enter":
 		if m.focus == FocusGroups {
-			m.screen = ScreenGroups
-			m.detailExpanded = false
-			m.clearMessage()
+			m.openGroups()
 		} else {
 			m.detailExpanded = true
 		}
@@ -378,8 +377,7 @@ func (m *Model) updateKey(message bubbletea.KeyPressMsg) bubbletea.Cmd {
 		m.detailExpanded = false
 		m.focus = FocusSkills
 	case "g":
-		m.screen = ScreenGroups
-		m.clearMessage()
+		m.openGroups()
 	case "u":
 		m.openReconcile()
 	case "d":
@@ -438,6 +436,13 @@ func (m *Model) updateGroups(message bubbletea.KeyPressMsg, key string) bubblete
 		}
 	}
 	return nil
+}
+
+func (m *Model) openGroups() {
+	m.screen = ScreenGroups
+	m.normalizeGroupSelection()
+	m.detailExpanded = false
+	m.clearMessage()
 }
 
 func (m *Model) updateEditor(message bubbletea.KeyPressMsg) bubbletea.Cmd {
@@ -541,7 +546,6 @@ func (m *Model) updateModal(message bubbletea.KeyPressMsg) bubbletea.Cmd {
 		} else if err := m.refresh(); err != nil {
 			m.setError(err)
 		} else {
-			m.selectedGroup = ""
 			m.setMessage(messageSuccess, fmt.Sprintf("Deleted group %s", m.deleteGroup))
 		}
 		m.modal = modalNone
@@ -594,7 +598,19 @@ func (m *Model) moveGroup(delta int) {
 			}
 		}
 	}
-	index += delta
+	if m.screen == ScreenGroups {
+		if index < 0 {
+			index = 0
+		} else {
+			index += delta
+		}
+	} else {
+		index += delta
+	}
+
+	if m.screen == ScreenGroups && index < 0 {
+		index = 0
+	}
 	if index < -1 {
 		index = -1
 	}
@@ -621,6 +637,21 @@ func (m *Model) normalizeSelection() {
 		}
 	}
 	m.selectedSkill = visible[0].ID
+}
+
+func (m *Model) normalizeGroupSelection() {
+	if len(m.groups) == 0 {
+		m.selectedGroup = ""
+		return
+	}
+	for _, group := range m.groups {
+		if group.Name == m.selectedGroup {
+			return
+		}
+	}
+	if m.screen == ScreenGroups {
+		m.selectedGroup = m.groups[0].Name
+	}
 }
 
 func (m *Model) visibleSkills() []catalog.Skill {
