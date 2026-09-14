@@ -919,8 +919,32 @@ func (m *Model) panel(title, content string, width, height int, focused bool) st
 }
 
 func stateLine(skill catalog.Skill) string {
+	name := displayName(skill)
+	if name != skill.ID {
+		name = fmt.Sprintf("%s [%s]", name, skill.ID)
+	}
+	badge := stateStyle(skill.State).Render(fmt.Sprintf("%s %s", stateIcon(skill.State), skill.State))
+	return fmt.Sprintf("%s %s", badge, name)
+}
+
+func stateStyle(state catalog.State) lipgloss.Style {
+	color := lipgloss.Color("8")
+	switch state {
+	case catalog.StateActive:
+		color = lipgloss.Color("10")
+	case catalog.StateDisabled:
+		color = lipgloss.Color("8")
+	case catalog.StateConflict, catalog.StateBroken:
+		color = lipgloss.Color("9")
+	case catalog.StateInvalid:
+		color = lipgloss.Color("13")
+	}
+	return lipgloss.NewStyle().Bold(true).Foreground(color)
+}
+
+func stateIcon(state catalog.State) string {
 	icon := "?"
-	switch skill.State {
+	switch state {
 	case catalog.StateActive:
 		icon = "●"
 	case catalog.StateDisabled:
@@ -932,11 +956,7 @@ func stateLine(skill catalog.Skill) string {
 	case catalog.StateInvalid:
 		icon = "?"
 	}
-	name := displayName(skill)
-	if name != skill.ID {
-		name = fmt.Sprintf("%s [%s]", name, skill.ID)
-	}
-	return fmt.Sprintf("%s %s (%s)", icon, name, skill.State)
+	return icon
 }
 
 func sourceLine(skill catalog.Skill) string {

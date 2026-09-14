@@ -11,6 +11,7 @@ import (
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/paths"
 	bubbletea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 func TestMainViewAndKeyboardInteractions(t *testing.T) {
@@ -224,6 +225,22 @@ func TestDetailsPanelIsReadOnlySummary(t *testing.T) {
 	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyTab})
 	if model.focus != FocusGroups {
 		t.Fatalf("second tab focus = %v, want groups", model.focus)
+	}
+}
+
+func TestSkillStateBadgesUseSemanticColors(t *testing.T) {
+	want := map[catalog.State]lipgloss.Color{
+		catalog.StateActive:   lipgloss.Color("10"),
+		catalog.StateDisabled: lipgloss.Color("8"),
+		catalog.StateConflict: lipgloss.Color("9"),
+		catalog.StateBroken:   lipgloss.Color("9"),
+		catalog.StateInvalid:  lipgloss.Color("13"),
+	}
+
+	for state, color := range want {
+		if got := stateStyle(state).GetForeground(); got != color {
+			t.Fatalf("state %s color = %v, want %v", state, got, color)
+		}
 	}
 }
 
