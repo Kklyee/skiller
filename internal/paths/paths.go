@@ -9,12 +9,14 @@ import (
 const (
 	activeDirEnv   = "SKILLER_ACTIVE_DIR"
 	disabledDirEnv = "SKILLER_DISABLED_DIR"
+	groupsDirEnv   = "SKILLER_GROUPS_DIR"
 	journalEnv     = "SKILLER_TRANSACTION_JOURNAL"
 )
 
 type Set struct {
 	Active   string
 	Disabled string
+	Groups   string
 	Journal  string
 }
 
@@ -26,6 +28,7 @@ func Default() (Set, error) {
 
 	active := filepath.Join(home, ".agents", "skills")
 	disabled := filepath.Join(home, ".skiller", "disabled")
+	groups := filepath.Join(home, ".skiller", "groups")
 	journal := filepath.Join(home, ".skiller", "transaction.json")
 
 	if value, ok := os.LookupEnv(activeDirEnv); ok && value != "" {
@@ -36,6 +39,10 @@ func Default() (Set, error) {
 		disabled = value
 	}
 
+	if value, ok := os.LookupEnv(groupsDirEnv); ok && value != "" {
+		groups = value
+	}
+
 	if value, ok := os.LookupEnv(journalEnv); ok && value != "" {
 		journal = value
 	}
@@ -43,6 +50,7 @@ func Default() (Set, error) {
 	return Set{
 		Active:   active,
 		Disabled: disabled,
+		Groups:   groups,
 		Journal:  journal,
 	}, nil
 }
