@@ -32,7 +32,6 @@ type Focus uint8
 const (
 	FocusGroups Focus = iota + 1
 	FocusSkills
-	FocusDetails
 )
 
 type modal uint8
@@ -197,7 +196,7 @@ func (m *Model) updateKey(message bubbletea.KeyMsg) bubbletea.Cmd {
 	switch key {
 	case "tab":
 		m.focus++
-		if m.focus > FocusDetails {
+		if m.focus > FocusSkills {
 			m.focus = FocusGroups
 		}
 	case "up", "k":
@@ -211,7 +210,6 @@ func (m *Model) updateKey(message bubbletea.KeyMsg) bubbletea.Cmd {
 		m.search = ""
 	case "enter":
 		m.detailExpanded = true
-		m.focus = FocusDetails
 	case "esc":
 		m.detailExpanded = false
 		m.focus = FocusSkills
@@ -638,12 +636,12 @@ func (m *Model) viewMain() string {
 		panels := []string{
 			m.panel("Groups", m.viewGroupPanel(), groupWidth, bodyHeight, m.focus == FocusGroups),
 			m.panel("Skills", m.viewSkillsPanel(), skillsWidth, bodyHeight, m.focus == FocusSkills),
-			m.panel("Details", m.viewDetailsPanel(), detailsWidth, bodyHeight, m.focus == FocusDetails),
+			m.panel("Details", m.viewDetailsPanel(), detailsWidth, bodyHeight, false),
 		}
 		return strings.Join([]string{header, lipgloss.JoinHorizontal(lipgloss.Top, panels...), m.viewFooter()}, "\n")
 	}
 	if m.detailExpanded {
-		return strings.Join([]string{header, m.panel("Details", m.viewDetailsPanel(), m.width, bodyHeight, true), m.viewFooter()}, "\n")
+		return strings.Join([]string{header, m.panel("Details", m.viewDetailsPanel(), m.width, bodyHeight, false), m.viewFooter()}, "\n")
 	}
 
 	usableSkillsWidth := m.width - groupWidth
@@ -738,32 +736,9 @@ func (m *Model) viewDetailsPanel() string {
 	}
 	lines := []string{
 		"Name: " + displayName(skill),
-		"ID: " + skill.ID,
 		"Description: " + valueOrDash(skill.Description),
-		"Status: " + stateLine(skill),
+		"Status: " + skill.State.String(),
 		"Groups: " + strings.Join(groups, ", "),
-		"Active path: " + valueOrDash(skill.ActivePath),
-		"Disabled path: " + valueOrDash(skill.DisabledPath),
-		"SKILL.md: " + valueOrDash(skill.SkillFile),
-		"Source: " + sourceLine(skill),
-	}
-	if skill.ActivePath != "" {
-		lines = append(lines, "Active source: "+skill.ActiveSource.String())
-	}
-	if skill.DisabledPath != "" {
-		lines = append(lines, "Disabled source: "+skill.DisabledSource.String())
-	}
-	if skill.ActiveLinkTarget != "" {
-		lines = append(lines, "Active target: "+skill.ActiveLinkTarget)
-	}
-	if skill.DisabledLinkTarget != "" {
-		lines = append(lines, "Disabled target: "+skill.DisabledLinkTarget)
-	}
-	if skill.ActiveIssue != "" {
-		lines = append(lines, "Active issue: "+skill.ActiveIssue)
-	}
-	if skill.DisabledIssue != "" {
-		lines = append(lines, "Disabled issue: "+skill.DisabledIssue)
 	}
 	return strings.Join(lines, "\n")
 }

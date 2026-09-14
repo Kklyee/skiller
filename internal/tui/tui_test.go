@@ -3,6 +3,7 @@ package tui
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -174,6 +175,55 @@ func TestResponsiveDetailsAndMinimumSize(t *testing.T) {
 	model.Update(bubbletea.WindowSizeMsg{Width: 40, Height: 20})
 	if !strings.Contains(model.View(), "Terminal too small") {
 		t.Fatalf("minimum size message missing:\n%s", model.View())
+	}
+}
+
+func TestDetailsPanelIsReadOnlySummary(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	groupsDir := filepath.Join(root, "groups")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+
+	store := group.New(groupsDir)
+	if _, err := store.Create("coding"); err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	if _, err := store.Add("coding", "alpha"); err != nil {
+		t.Fatalf("add group skill: %v", err)
+	}
+
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: disabledDir,
+		Groups:   groupsDir,
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+
+	if got, want := strings.Split(model.viewDetailsPanel(), "\n"), []string{
+		"Name: Alpha",
+		"Description: First skill",
+		"Status: active",
+		"Groups: coding",
+	}; !slices.Equal(got, want) {
+		t.Fatalf("details panel = %q, want %q", got, want)
+	}
+
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyTab})
+	if model.focus != FocusSkills {
+		t.Fatalf("first tab focus = %v, want skills", model.focus)
+	}
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEnter})
+	if model.focus != FocusSkills {
+		t.Fatalf("enter focus = %v, want skills", model.focus)
+	}
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyTab})
+	if model.focus != FocusGroups {
+		t.Fatalf("second tab focus = %v, want groups", model.focus)
 	}
 }
 
