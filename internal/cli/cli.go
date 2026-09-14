@@ -24,7 +24,8 @@ func NewRootCommand() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if cmd.Name() == "doctor" {
+			switch cmd.Name() {
+			case "doctor", "completion", "version":
 				return nil
 			}
 
@@ -54,6 +55,7 @@ func NewRootCommand() *cobra.Command {
 		command.NewSync(),
 		command.NewRun(),
 		command.NewVersion(),
+		command.NewCompletion(),
 		command.NewTUI(),
 	)
 
