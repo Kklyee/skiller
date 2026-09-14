@@ -1,0 +1,52 @@
+version: 2
+
+project_name: skiller
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: skiller
+    main: ./cmd/skiller
+    binary: skiller
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X github.com/Kklyee/skiller/internal/version.Version={{ .Version }} -X github.com/Kklyee/skiller/internal/version.Commit={{ .Commit }} -X github.com/Kklyee/skiller/internal/version.Date={{ .CommitDate }}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    mod_timestamp: '{{ .CommitTimestamp }}'
+
+archives:
+  - id: skiller
+    ids:
+      - skiller
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+      - none*
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: '{{ incpatch .Version }}-next'
+
+changelog:
+  use: git
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'

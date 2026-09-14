@@ -8,6 +8,9 @@ commit, and build date.
 Generate completion scripts with `skiller completion bash`, `zsh`, `fish`, or
 `powershell`.
 
+Tagged releases are built by GoReleaser for Linux, macOS, and Windows on
+amd64 and arm64.
+
 ## Project configuration
 
 Place a `.skiller.toml` file in a project directory. Use one profile:
