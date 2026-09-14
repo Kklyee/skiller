@@ -11,18 +11,25 @@ import (
 )
 
 type diskSkill struct {
-	ID         string
-	Path       string
-	State      State
-	Source     Source
-	LinkTarget string
-	Issue      string
+	ID          string
+	Path        string
+	State       State
+	Source      Source
+	LinkTarget  string
+	Issue       string
+	Name        string
+	Description string
+	SkillFile   string
 }
 
 type observedSkill struct {
 	skill         Skill
 	activeState   State
 	disabledState State
+	activeName    string
+	activeDesc    string
+	disabledName  string
+	disabledDesc  string
 }
 
 func Scan(activeDir, disabledDir string) ([]Skill, error) {
@@ -45,7 +52,10 @@ func Scan(activeDir, disabledDir string) ([]Skill, error) {
 		observed.skill.ActiveSource = entry.Source
 		observed.skill.ActiveLinkTarget = entry.LinkTarget
 		observed.skill.ActiveIssue = entry.Issue
+		observed.skill.ActiveSkillFile = entry.SkillFile
 		observed.activeState = entry.State
+		observed.activeName = entry.Name
+		observed.activeDesc = entry.Description
 
 		byID[entry.ID] = observed
 	}
@@ -57,7 +67,10 @@ func Scan(activeDir, disabledDir string) ([]Skill, error) {
 		observed.skill.DisabledSource = entry.Source
 		observed.skill.DisabledLinkTarget = entry.LinkTarget
 		observed.skill.DisabledIssue = entry.Issue
+		observed.skill.DisabledSkillFile = entry.SkillFile
 		observed.disabledState = entry.State
+		observed.disabledName = entry.Name
+		observed.disabledDesc = entry.Description
 
 		byID[entry.ID] = observed
 	}
@@ -83,6 +96,19 @@ func Scan(activeDir, disabledDir string) ([]Skill, error) {
 			default:
 				skill.State = StateDisabled
 			}
+		}
+
+		if skill.ActivePath != "" {
+			skill.Name = observed.activeName
+			skill.Description = observed.activeDesc
+			skill.SkillFile = skill.ActiveSkillFile
+		} else {
+			skill.Name = observed.disabledName
+			skill.Description = observed.disabledDesc
+			skill.SkillFile = skill.DisabledSkillFile
+		}
+		if skill.Name == "" {
+			skill.Name = skill.ID
 		}
 
 		skills = append(skills, skill)
@@ -135,6 +161,7 @@ func scanDir(dir string) ([]diskSkill, error) {
 					Source:     source,
 					LinkTarget: linkTarget,
 					Issue:      "link target does not exist",
+					SkillFile:  filepath.Join(entryPath, "SKILL.md"),
 				})
 				continue
 			}
@@ -153,6 +180,7 @@ func scanDir(dir string) ([]diskSkill, error) {
 				Source:     source,
 				LinkTarget: linkTarget,
 				Issue:      "skill path is not a directory",
+				SkillFile:  filepath.Join(entryPath, "SKILL.md"),
 			})
 			continue
 		}
@@ -168,6 +196,7 @@ func scanDir(dir string) ([]diskSkill, error) {
 				Source:     source,
 				LinkTarget: linkTarget,
 				Issue:      "missing SKILL.md",
+				SkillFile:  skillFile,
 			})
 			continue
 		}
@@ -183,16 +212,25 @@ func scanDir(dir string) ([]diskSkill, error) {
 				Source:     source,
 				LinkTarget: linkTarget,
 				Issue:      "SKILL.md is not a regular file",
+				SkillFile:  skillFile,
 			})
 			continue
 		}
 
+		name, description, err := readMetadata(skillFile, entry.Name())
+		if err != nil {
+			return nil, err
+		}
+
 		skills = append(skills, diskSkill{
-			ID:         entry.Name(),
-			Path:       entryPath,
-			State:      StateActive,
-			Source:     source,
-			LinkTarget: linkTarget,
+			ID:          entry.Name(),
+			Path:        entryPath,
+			State:       StateActive,
+			Source:      source,
+			LinkTarget:  linkTarget,
+			Name:        name,
+			Description: description,
+			SkillFile:   skillFile,
 		})
 	}
 

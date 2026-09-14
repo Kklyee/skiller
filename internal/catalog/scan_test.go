@@ -112,6 +112,40 @@ func TestScanMissingDirectories(t *testing.T) {
 	}
 }
 
+func TestScanSkillMetadata(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	skillDir := filepath.Join(activeDir, "review")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatalf("create skill directory: %v", err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(skillDir, "SKILL.md"),
+		[]byte("---\nname: Code Review\ndescription: Review code carefully.\n---\n# Content\n"),
+		0o644,
+	); err != nil {
+		t.Fatalf("write SKILL.md: %v", err)
+	}
+
+	skills, err := Scan(activeDir, filepath.Join(root, "disabled"))
+	if err != nil {
+		t.Fatalf("scan skills: %v", err)
+	}
+	if len(skills) != 1 {
+		t.Fatalf("skills: got %d, want 1", len(skills))
+	}
+
+	if skills[0].Name != "Code Review" {
+		t.Fatalf("name: got %q, want %q", skills[0].Name, "Code Review")
+	}
+	if skills[0].Description != "Review code carefully." {
+		t.Fatalf("description: got %q, want %q", skills[0].Description, "Review code carefully.")
+	}
+	if skills[0].SkillFile != filepath.Join(skillDir, "SKILL.md") {
+		t.Fatalf("skill file: got %q", skills[0].SkillFile)
+	}
+}
+
 func createTestSkill(
 	t *testing.T,
 	parent string,

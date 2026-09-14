@@ -59,6 +59,11 @@ type Skill struct {
 	DisabledLinkTarget string
 	ActiveIssue        string
 	DisabledIssue      string
+	Name               string
+	Description        string
+	SkillFile          string
+	ActiveSkillFile    string
+	DisabledSkillFile  string
 }
 
 type Summary struct {
