@@ -24,6 +24,7 @@ func NewRootCommand() *cobra.Command {
 		command.NewStatus(),
 		command.NewDoctor(),
 		command.NewGroup(),
+		command.NewUse(),
 	)
 
 	return cmd
