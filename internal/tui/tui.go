@@ -83,6 +83,11 @@ type mainColumn struct {
 	focused bool
 }
 
+type keyHint struct {
+	key         string
+	description string
+}
+
 func NewModel(pathSet paths.Set) (Model, error) {
 	model := Model{
 		paths:  pathSet,
@@ -788,11 +793,36 @@ func (m *Model) viewDetailsPanel() string {
 }
 
 func (m *Model) viewFooter() string {
-	footer := "↑↓/jk move  tab focus  space toggle  / search  g groups  u use  enter details  d doctor  ? help  q quit"
-	if m.message != "" {
-		footer += "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(m.message)
+	hints := []keyHint{
+		{key: "↑↓/jk", description: "move"},
+		{key: "tab", description: "focus"},
+		{key: "space", description: "toggle"},
+		{key: "/", description: "search"},
+		{key: "g", description: "groups"},
+		{key: "u", description: "use"},
+		{key: "enter", description: "details"},
+		{key: "d", description: "doctor"},
+		{key: "?", description: "help"},
+		{key: "q", description: "quit"},
 	}
-	return lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render(footer)
+	if m.searchActive {
+		hints = []keyHint{
+			{key: "type", description: "filter"},
+			{key: "enter", description: "finish search"},
+			{key: "esc", description: "cancel"},
+		}
+	} else if m.detailExpanded {
+		hints = []keyHint{
+			{key: "↑↓/jk", description: "move"},
+			{key: "space", description: "toggle"},
+			{key: "esc", description: "collapse"},
+		}
+	}
+	lines := []string{renderKeyHints(hints...)}
+	if m.message != "" {
+		lines = append(lines, lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(m.message))
+	}
+	return strings.Join(lines, "\n")
 }
 
 func (m *Model) viewGroups() string {
@@ -820,10 +850,30 @@ func (m *Model) viewGroups() string {
 	if m.message != "" {
 		body += "\n\n" + m.message
 	}
+	footer := renderKeyHints(
+		keyHint{key: "↑↓/jk", description: "move"},
+		keyHint{key: "n", description: "new"},
+		keyHint{key: "e", description: "edit"},
+		keyHint{key: "d", description: "delete"},
+		keyHint{key: "enter", description: "inspect"},
+		keyHint{key: "esc", description: "back"},
+	)
+	if m.modal == modalGroupName {
+		footer = renderKeyHints(
+			keyHint{key: "type", description: "name"},
+			keyHint{key: "enter", description: "create"},
+			keyHint{key: "esc", description: "cancel"},
+		)
+	} else if m.modal == modalDeleteGroup {
+		footer = renderKeyHints(
+			keyHint{key: "enter/y", description: "delete"},
+			keyHint{key: "esc/n", description: "cancel"},
+		)
+	}
 	return strings.Join([]string{
 		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Groups"),
 		m.panel("Groups", body, m.width, m.height-3, true),
-		"n new  e edit  d delete  enter inspect  esc back",
+		footer,
 	}, "\n")
 }
 
@@ -849,7 +899,12 @@ func (m *Model) viewGroupEditor() string {
 	return strings.Join([]string{
 		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Edit Group"),
 		m.panel("Edit", strings.Join(lines, "\n"), m.width, m.height-3, true),
-		"space toggle  s save  esc cancel",
+		renderKeyHints(
+			keyHint{key: "↑↓/jk", description: "move"},
+			keyHint{key: "space", description: "select"},
+			keyHint{key: "s", description: "save"},
+			keyHint{key: "esc", description: "cancel"},
+		),
 	}, "\n")
 }
 
@@ -870,7 +925,7 @@ func (m *Model) viewGroupDetails() string {
 		return strings.Join([]string{
 			lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Group Details"),
 			m.panel("Group", strings.Join(lines, "\n"), m.width, m.height-3, true),
-			"esc back",
+			renderKeyHints(keyHint{key: "esc", description: "back"}),
 		}, "\n")
 	}
 	return "Group not found\nesc back\n"
@@ -909,7 +964,7 @@ func (m *Model) viewReconcileModal() string {
 	return strings.Join([]string{
 		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Reconcile"),
 		m.panel("Activate", strings.Join(lines, "\n"), m.width, m.height-3, true),
-		"enter apply  esc cancel",
+		renderKeyHints(keyHint{key: "enter", description: "apply"}, keyHint{key: "esc", description: "cancel"}),
 	}, "\n")
 }
 
@@ -922,7 +977,7 @@ func (m *Model) viewDoctor() string {
 	return strings.Join([]string{
 		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Doctor"),
 		m.panel("Doctor", strings.Join(lines, "\n"), m.width, m.height-3, true),
-		"esc back",
+		renderKeyHints(keyHint{key: "esc", description: "back"}),
 	}, "\n")
 }
 
@@ -942,8 +997,16 @@ func (m *Model) viewHelp() string {
 	return strings.Join([]string{
 		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Help"),
 		m.panel("Keyboard", strings.Join(lines, "\n"), m.width, m.height-3, true),
-		"esc back",
+		renderKeyHints(keyHint{key: "esc/q", description: "back"}),
 	}, "\n")
+}
+
+func renderKeyHints(hints ...keyHint) string {
+	parts := make([]string, 0, len(hints))
+	for _, hint := range hints {
+		parts = append(parts, helpKeyStyle().Render(hint.key)+" "+helpTextStyle().Render(hint.description))
+	}
+	return strings.Join(parts, "  ")
 }
 
 func helpLine(key, description string) string {

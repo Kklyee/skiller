@@ -396,6 +396,34 @@ func TestReconcileIssuesKeepPreviewOpen(t *testing.T) {
 	}
 }
 
+func TestTUIShowsContextualKeyboardHints(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: filepath.Join(root, "disabled"),
+		Groups:   filepath.Join(root, "groups"),
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'/'}})
+	if view := model.View(); !strings.Contains(view, "finish search") || !strings.Contains(view, "cancel") {
+		t.Fatalf("search hints missing:\n%s", view)
+	}
+
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEsc})
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'g'}})
+	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'n'}})
+	if view := model.View(); !strings.Contains(view, "type name") || !strings.Contains(view, "create") {
+		t.Fatalf("group creation hints missing:\n%s", view)
+	}
+}
+
 func createSkill(t *testing.T, parent, id, name, description string) {
 	t.Helper()
 	dir := filepath.Join(parent, id)
