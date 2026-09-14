@@ -290,6 +290,43 @@ func TestDoctorViewUsesSemanticHealthSections(t *testing.T) {
 	}
 }
 
+func TestGroupDialogsUseDedicatedPanels(t *testing.T) {
+	root := t.TempDir()
+	groupsDir := filepath.Join(root, "groups")
+	if _, err := group.New(groupsDir).Create("coding"); err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	model, err := NewModel(paths.Set{
+		Active:   filepath.Join(root, "active"),
+		Disabled: filepath.Join(root, "disabled"),
+		Groups:   groupsDir,
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+
+	model.Update(keyText("g"))
+	model.Update(keyText("n"))
+	view := viewText(&model)
+	for _, want := range []string{"New Group", "Group name", "type name", "enter create"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("new group dialog missing %q:\n%s", want, view)
+		}
+	}
+
+	model.Update(keyCode(bubbletea.KeyEsc))
+	model.Update(keyCode(bubbletea.KeyDown))
+	model.Update(keyText("d"))
+	view = viewText(&model)
+	for _, want := range []string{"Confirm Delete", "Delete group coding?", "enter/y delete"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("delete dialog missing %q:\n%s", want, view)
+		}
+	}
+}
+
 func TestSpaceOnlyTogglesSkillsWhenSkillsFocused(t *testing.T) {
 	root := t.TempDir()
 	activeDir := filepath.Join(root, "active")

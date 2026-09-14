@@ -194,6 +194,12 @@ func (m *Model) viewContent() string {
 	if m.modal == modalReconcile {
 		return m.viewReconcileModal()
 	}
+	if m.modal == modalGroupName {
+		return m.viewGroupNameModal()
+	}
+	if m.modal == modalDeleteGroup {
+		return m.viewDeleteGroupModal()
+	}
 
 	switch m.screen {
 	case ScreenGroups:
@@ -1180,18 +1186,6 @@ func (m *Model) viewGroups() string {
 		keyHint{key: "enter", description: "inspect"},
 		keyHint{key: "esc", description: "back"},
 	)
-	if m.modal == modalGroupName {
-		footer = renderKeyHints(
-			keyHint{key: "type", description: "name"},
-			keyHint{key: "enter", description: "create"},
-			keyHint{key: "esc", description: "cancel"},
-		)
-	} else if m.modal == modalDeleteGroup {
-		footer = renderKeyHints(
-			keyHint{key: "enter/y", description: "delete"},
-			keyHint{key: "esc/n", description: "cancel"},
-		)
-	}
 	return strings.Join([]string{
 		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Groups"),
 		lipgloss.JoinHorizontal(
@@ -1225,12 +1219,6 @@ func (m *Model) viewGroupManagerList() string {
 	}
 	if len(m.groups) == 0 {
 		lines = append(lines, "  No groups")
-	}
-	if m.modal == modalGroupName {
-		lines = append(lines, "", "New group name: "+m.input+"_")
-	}
-	if m.modal == modalDeleteGroup {
-		lines = append(lines, "", "Delete group "+m.deleteGroup+"? enter/y confirm, esc/n cancel")
 	}
 	if m.message != "" {
 		lines = append(lines, "", m.renderedMessage())
@@ -1292,6 +1280,43 @@ func (m *Model) selectedGroupValue() (group.Group, bool) {
 		}
 	}
 	return group.Group{}, false
+}
+
+func (m *Model) viewGroupNameModal() string {
+	lines := []string{
+		helpTextStyle().Render("Create a new group"),
+		"",
+		helpTextStyle().Render("Group name"),
+		selectedRowStyle().Render(m.input + "▌"),
+	}
+	if m.message != "" {
+		lines = append(lines, "", m.renderedMessage())
+	}
+	return strings.Join([]string{
+		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Groups"),
+		m.panel("New Group", strings.Join(lines, "\n"), m.width, m.height-3, true),
+		renderKeyHints(
+			keyHint{key: "type", description: "name"},
+			keyHint{key: "enter", description: "create"},
+			keyHint{key: "esc", description: "cancel"},
+		),
+	}, "\n")
+}
+
+func (m *Model) viewDeleteGroupModal() string {
+	lines := []string{
+		messageStyle(messageError).Render("Delete group " + m.deleteGroup + "?"),
+		"",
+		helpTextStyle().Render("This removes group metadata only; installed skills are not changed."),
+	}
+	return strings.Join([]string{
+		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Groups"),
+		m.panel("Confirm Delete", strings.Join(lines, "\n"), m.width, m.height-3, true),
+		renderKeyHints(
+			keyHint{key: "enter/y", description: "delete"},
+			keyHint{key: "esc/n", description: "cancel"},
+		),
+	}, "\n")
 }
 
 func (m *Model) viewGroupEditor() string {
