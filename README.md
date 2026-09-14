@@ -21,6 +21,7 @@ Skill 环境选择保存成可重复的配置，减少手动移动目录、反�
 - 使用 Profile 组合分组、单独 Skill 和排除项；
 - 使用项目目录中的 `.skiller.toml` 同步环境；
 - 使用 pin 保证关键 Skill 在任何分组或项目同步后仍保持 active；
+- 查看 Skill 的实际位置、目录/链接来源和 `SKILL.md` 路径；
 - 通过 `doctor` 检查目录、事务和失效 pin；
 - 使用 TUI 浏览 Groups、Skills 和 Details。
 
@@ -91,6 +92,16 @@ skiller unpin tdd
 ```
 
 不存在的 Skill 也可以先 pin，`skiller doctor` 会报告失效 pin。
+
+## Skill 来源
+
+```bash
+skiller provenance code-review
+```
+
+该命令用于确认 Skill 当前来自 active 还是 disabled 目录，以及它是普通目录、
+符号链接还是 Windows junction。若检测到 active 和 disabled 两份副本，会同时
+列出两份位置，方便处理外部安装器重新创建副本造成的冲突。
 
 ## 项目同步
 
@@ -181,6 +192,7 @@ skiller list
 skiller status
 skiller enable <skill>
 skiller disable <skill>
+skiller provenance <skills...>
 skiller pin <skills...>
 skiller unpin <skills...>
 skiller pins
