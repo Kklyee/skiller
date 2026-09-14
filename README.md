@@ -119,10 +119,12 @@ skiller sync
 skiller run codex
 skiller run gemini
 skiller run opencode
+skiller run codex --restore
 ```
 
 `run` 会先根据当前项目配置同步 Skill 环境，再启动对应 Agent。Agent 需要
-已经安装，并且可执行文件位于系统 `PATH` 中。
+已经安装，并且可执行文件位于系统 `PATH` 中。使用 `--restore` 时，Skiller
+会在 Agent 退出后恢复启动前的 Skill 环境，即使 Agent 返回错误也会执行恢复。
 
 ## TUI 快捷键
 
@@ -186,7 +188,7 @@ skiller group <list|create|delete|show|add|remove>
 skiller use <group> [--dry-run]
 skiller profile <list|show|create|edit|delete|use>
 skiller sync [--dry-run]
-skiller run <codex|gemini|opencode>
+skiller run <codex|gemini|opencode> [--restore]
 skiller tui
 ```
 

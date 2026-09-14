@@ -4,9 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 
 	"github.com/Kklyee/skiller/internal/agent"
+	"github.com/Kklyee/skiller/internal/catalog"
+	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/paths"
+	"github.com/Kklyee/skiller/internal/reconcile"
 	"github.com/Kklyee/skiller/internal/transaction"
 	"github.com/spf13/cobra"
 )
@@ -16,7 +20,8 @@ func NewRun() *cobra.Command {
 }
 
 func newRun(runAgent func(string, io.Reader, io.Writer, io.Writer) error) *cobra.Command {
-	return &cobra.Command{
+	var restore bool
+	command := &cobra.Command{
 		Use:       "run <agent>",
 		Short:     "Synchronize skills and launch a coding agent",
 		Args:      cobra.ExactArgs(1),
@@ -30,6 +35,16 @@ func newRun(runAgent func(string, io.Reader, io.Writer, io.Writer) error) *cobra
 			if err != nil {
 				return err
 			}
+
+			var originalActive []string
+			if restore {
+				skills, err := catalog.Scan(pathSet.Active, pathSet.Disabled)
+				if err != nil {
+					return fmt.Errorf("snapshot active skills: %w", err)
+				}
+				originalActive = activeSkillIDs(skills)
+			}
+
 			plan, configPath, err := syncPlan(pathSet)
 			if err != nil {
 				return err
@@ -60,7 +75,53 @@ func newRun(runAgent func(string, io.Reader, io.Writer, io.Writer) error) *cobra
 			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Launching %s\n", args[0]); err != nil {
 				return err
 			}
-			return runAgent(args[0], cmd.InOrStdin(), cmd.OutOrStdout(), cmd.ErrOrStderr())
+
+			agentErr := runAgent(args[0], cmd.InOrStdin(), cmd.OutOrStdout(), cmd.ErrOrStderr())
+			if !restore {
+				return agentErr
+			}
+
+			restoreErr := restoreSkillEnvironment(pathSet, originalActive)
+			if restoreErr == nil {
+				if _, err := fmt.Fprintln(cmd.OutOrStdout(), "Restored original skill environment"); err != nil {
+					restoreErr = err
+				}
+			}
+			return errors.Join(agentErr, restoreErr)
 		},
 	}
+	command.Flags().BoolVar(&restore, "restore", false, "restore the original skill environment after the agent exits")
+
+	return command
+}
+
+func activeSkillIDs(skills []catalog.Skill) []string {
+	active := make([]string, 0, len(skills))
+	for _, skill := range skills {
+		if skill.State == catalog.StateActive {
+			active = append(active, skill.ID)
+		}
+	}
+	slices.Sort(active)
+	return active
+}
+
+func restoreSkillEnvironment(pathSet paths.Set, originalActive []string) error {
+	skills, err := catalog.Scan(pathSet.Active, pathSet.Disabled)
+	if err != nil {
+		return fmt.Errorf("inspect skills for restore: %w", err)
+	}
+	pinned, err := loadPins(pathSet)
+	if err != nil {
+		return err
+	}
+
+	plan := reconcile.BuildWithPins(group.Group{Name: "restore", Skills: originalActive}, skills, pinned)
+	if plan.HasIssues() {
+		return errors.New("cannot restore original skill environment with missing skills or catalog issues")
+	}
+	if err := transaction.Apply(pathSet, plan); err != nil {
+		return fmt.Errorf("restore original skill environment: %w", err)
+	}
+	return nil
 }
