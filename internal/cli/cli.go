@@ -21,6 +21,7 @@ func NewRootCommand() *cobra.Command {
 		command.NewList(),
 		command.NewDisable(),
 		command.NewEnable(),
+		command.NewStatus(),
 	)
 
 	return cmd

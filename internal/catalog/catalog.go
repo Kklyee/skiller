@@ -60,3 +60,48 @@ type Skill struct {
 	ActiveIssue        string
 	DisabledIssue      string
 }
+
+type Summary struct {
+	ActiveDir   string
+	DisabledDir string
+	Installed   int
+	Active      int
+	Disabled    int
+	Conflict    int
+	Broken      int
+	Invalid     int
+}
+
+func SummaryFor(activeDir, disabledDir string) (Summary, error) {
+	skills, err := Scan(activeDir, disabledDir)
+	if err != nil {
+		return Summary{}, err
+	}
+
+	summary := Summarize(skills)
+	summary.ActiveDir = activeDir
+	summary.DisabledDir = disabledDir
+
+	return summary, nil
+}
+
+func Summarize(skills []Skill) Summary {
+	summary := Summary{Installed: len(skills)}
+
+	for _, skill := range skills {
+		switch skill.State {
+		case StateActive:
+			summary.Active++
+		case StateDisabled:
+			summary.Disabled++
+		case StateConflict:
+			summary.Conflict++
+		case StateBroken:
+			summary.Broken++
+		case StateInvalid:
+			summary.Invalid++
+		}
+	}
+
+	return summary
+}
