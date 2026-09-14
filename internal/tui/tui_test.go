@@ -315,6 +315,37 @@ func TestMainColumnBodiesClipOverflowToFixedHeight(t *testing.T) {
 	}
 }
 
+func TestMainViewColumnsKeepEqualHeightAfterShrink(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	names := []string{
+		"ask-matt", "code-review", "codebase-design", "diagnosing-bugs", "domain-modeling",
+		"find-skills", "grill-me", "grill-with-docs", "grilling", "handoff", "implement",
+		"improve-codebase-architecture", "prototype", "research", "resolving-merge-conflicts",
+		"setup-matt-pocock-skills", "show-me", "tdd", "teach", "to-questionnaire", "to-spec",
+		"to-tickets", "triage", "wait-what", "wayfinder", "wizard", "writing-for-agents",
+	}
+	for _, name := range names {
+		createSkill(t, activeDir, name, name, "Description")
+	}
+	model, err := NewModel(paths.Set{
+		Active: activeDir, Disabled: filepath.Join(root, "disabled"), Groups: filepath.Join(root, "groups"),
+		Journal: filepath.Join(root, "transaction.json"), Lock: filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(bubbletea.WindowSizeMsg{Width: 180, Height: 50})
+	model.Update(bubbletea.WindowSizeMsg{Width: 120, Height: 30})
+	view := viewText(&model)
+	for _, line := range strings.Split(view, "\n") {
+		if strings.Count(line, "╰")+strings.Count(line, "└") == 3 {
+			return
+		}
+	}
+	t.Fatalf("main column bottom borders do not share one row:\n%s", view)
+}
+
 func TestSkillsPanelScrollsSelectedSkillIntoView(t *testing.T) {
 	root := t.TempDir()
 	activeDir := filepath.Join(root, "active")

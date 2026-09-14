@@ -1029,10 +1029,6 @@ func mainColumnBody(column mainColumn, height int) string {
 	if contentWidth < 1 {
 		contentWidth = 1
 	}
-	contentHeight := height - 2
-	if contentHeight < 1 {
-		contentHeight = 1
-	}
 	border := lipgloss.NormalBorder()
 	borderColor := lipgloss.Color("8")
 	if column.focused {
@@ -1041,7 +1037,7 @@ func mainColumnBody(column mainColumn, height int) string {
 	}
 	style := lipgloss.NewStyle().
 		Width(contentWidth).
-		Height(contentHeight).
+		Height(height).
 		MaxHeight(height).
 		Border(border).
 		BorderForeground(borderColor)
