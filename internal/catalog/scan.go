@@ -11,8 +11,18 @@ import (
 )
 
 type diskSkill struct {
-	ID   string
-	Path string
+	ID         string
+	Path       string
+	State      State
+	Source     Source
+	LinkTarget string
+	Issue      string
+}
+
+type observedSkill struct {
+	skill         Skill
+	activeState   State
+	disabledState State
 }
 
 func Scan(activeDir, disabledDir string) ([]Skill, error) {
@@ -26,36 +36,53 @@ func Scan(activeDir, disabledDir string) ([]Skill, error) {
 		return nil, fmt.Errorf("scan disabled skills: %w", err)
 	}
 
-	byID := make(map[string]Skill, len(active)+len(disabled))
+	byID := make(map[string]observedSkill, len(active)+len(disabled))
 
 	for _, entry := range active {
-		skill := byID[entry.ID]
-		skill.ID = entry.ID
-		skill.ActivePath = entry.Path
+		observed := byID[entry.ID]
+		observed.skill.ID = entry.ID
+		observed.skill.ActivePath = entry.Path
+		observed.skill.ActiveSource = entry.Source
+		observed.skill.ActiveLinkTarget = entry.LinkTarget
+		observed.skill.ActiveIssue = entry.Issue
+		observed.activeState = entry.State
 
-		byID[entry.ID] = skill
+		byID[entry.ID] = observed
 	}
 
 	for _, entry := range disabled {
-		skill := byID[entry.ID]
-		skill.ID = entry.ID
-		skill.DisabledPath = entry.Path
+		observed := byID[entry.ID]
+		observed.skill.ID = entry.ID
+		observed.skill.DisabledPath = entry.Path
+		observed.skill.DisabledSource = entry.Source
+		observed.skill.DisabledLinkTarget = entry.LinkTarget
+		observed.skill.DisabledIssue = entry.Issue
+		observed.disabledState = entry.State
 
-		byID[entry.ID] = skill
+		byID[entry.ID] = observed
 	}
 
 	skills := make([]Skill, 0, len(byID))
 
-	for _, skill := range byID {
+	for _, observed := range byID {
+		skill := observed.skill
+
 		switch {
 		case skill.ActivePath != "" && skill.DisabledPath != "":
 			skill.State = StateConflict
 
 		case skill.ActivePath != "":
-			skill.State = StateActive
+			skill.State = observed.activeState
 
 		case skill.DisabledPath != "":
-			skill.State = StateDisabled
+			switch observed.disabledState {
+			case StateBroken:
+				skill.State = StateBroken
+			case StateInvalid:
+				skill.State = StateInvalid
+			default:
+				skill.State = StateDisabled
+			}
 		}
 
 		skills = append(skills, skill)
@@ -82,7 +109,7 @@ func scanDir(dir string) ([]diskSkill, error) {
 	for _, entry := range entries {
 		entryPath := filepath.Join(dir, entry.Name())
 
-		info, err := os.Stat(entryPath)
+		info, err := os.Lstat(entryPath)
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
@@ -90,7 +117,43 @@ func scanDir(dir string) ([]diskSkill, error) {
 			return nil, fmt.Errorf("stat %q: %w", entryPath, err)
 		}
 
+		source := SourceDirectory
+		linkTarget := ""
+		isLink := false
+
+		if info.Mode()&(os.ModeSymlink|os.ModeIrregular) != 0 {
+			source, linkTarget, isLink = linkSource(entryPath)
+		}
+
+		if isLink {
+			info, err = os.Stat(entryPath)
+			if errors.Is(err, fs.ErrNotExist) {
+				skills = append(skills, diskSkill{
+					ID:         entry.Name(),
+					Path:       entryPath,
+					State:      StateBroken,
+					Source:     source,
+					LinkTarget: linkTarget,
+					Issue:      "link target does not exist",
+				})
+				continue
+			}
+			if err != nil {
+				return nil, fmt.Errorf("stat link target %q: %w", entryPath, err)
+			}
+		} else if !info.IsDir() {
+			continue
+		}
+
 		if !info.IsDir() {
+			skills = append(skills, diskSkill{
+				ID:         entry.Name(),
+				Path:       entryPath,
+				State:      StateInvalid,
+				Source:     source,
+				LinkTarget: linkTarget,
+				Issue:      "skill path is not a directory",
+			})
 			continue
 		}
 
@@ -98,6 +161,14 @@ func scanDir(dir string) ([]diskSkill, error) {
 
 		info, err = os.Stat(skillFile)
 		if errors.Is(err, fs.ErrNotExist) {
+			skills = append(skills, diskSkill{
+				ID:         entry.Name(),
+				Path:       entryPath,
+				State:      StateInvalid,
+				Source:     source,
+				LinkTarget: linkTarget,
+				Issue:      "missing SKILL.md",
+			})
 			continue
 		}
 		if err != nil {
@@ -105,12 +176,23 @@ func scanDir(dir string) ([]diskSkill, error) {
 		}
 
 		if !info.Mode().IsRegular() {
+			skills = append(skills, diskSkill{
+				ID:         entry.Name(),
+				Path:       entryPath,
+				State:      StateInvalid,
+				Source:     source,
+				LinkTarget: linkTarget,
+				Issue:      "SKILL.md is not a regular file",
+			})
 			continue
 		}
 
 		skills = append(skills, diskSkill{
-			ID:   entry.Name(),
-			Path: entryPath,
+			ID:         entry.Name(),
+			Path:       entryPath,
+			State:      StateActive,
+			Source:     source,
+			LinkTarget: linkTarget,
 		})
 	}
 

@@ -29,13 +29,71 @@ func TestScan(t *testing.T) {
 		t.Fatalf("scan skills: %v", err)
 	}
 
-	if len(skills) != 3 {
-		t.Fatalf("expected 3 skills, got %d", len(skills))
+	if len(skills) != 4 {
+		t.Fatalf("expected 4 skills, got %d", len(skills))
 	}
 
 	assertSkillState(t, skills[0], "code-review", StateActive)
-	assertSkillState(t, skills[1], "prototype", StateDisabled)
-	assertSkillState(t, skills[2], "research", StateConflict)
+	assertSkillState(t, skills[1], "not-a-skill", StateInvalid)
+	assertSkillState(t, skills[2], "prototype", StateDisabled)
+	assertSkillState(t, skills[3], "research", StateConflict)
+
+	if got, want := skills[1].ActiveIssue, "missing SKILL.md"; got != want {
+		t.Fatalf("invalid skill issue: got %q, want %q", got, want)
+	}
+}
+
+func TestScanBrokenAndSymlinkSkills(t *testing.T) {
+	root := t.TempDir()
+
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	targetDir := filepath.Join(root, "target")
+
+	if err := os.MkdirAll(activeDir, 0o755); err != nil {
+		t.Fatalf("create active directory: %v", err)
+	}
+	if err := os.MkdirAll(disabledDir, 0o755); err != nil {
+		t.Fatalf("create disabled directory: %v", err)
+	}
+
+	createTestSkill(t, targetDir, "source")
+
+	linkPath := filepath.Join(activeDir, "linked")
+	if err := os.Symlink(filepath.Join(targetDir, "source"), linkPath); err != nil {
+		if os.PathSeparator == '\\' {
+			t.Skipf("directory symlinks are unavailable: %v", err)
+		}
+		t.Fatalf("create directory symlink: %v", err)
+	}
+
+	brokenPath := filepath.Join(disabledDir, "broken")
+	if err := os.Symlink(filepath.Join(root, "missing"), brokenPath); err != nil {
+		if os.PathSeparator == '\\' {
+			t.Skipf("directory symlinks are unavailable: %v", err)
+		}
+		t.Fatalf("create broken symlink: %v", err)
+	}
+
+	skills, err := Scan(activeDir, disabledDir)
+	if err != nil {
+		t.Fatalf("scan skills: %v", err)
+	}
+
+	if len(skills) != 2 {
+		t.Fatalf("expected 2 skills, got %d", len(skills))
+	}
+
+	assertSkillState(t, skills[0], "broken", StateBroken)
+	assertSkillState(t, skills[1], "linked", StateActive)
+
+	if skills[1].ActiveSource != SourceSymlink {
+		t.Fatalf("expected symlink source, got %s", skills[1].ActiveSource)
+	}
+
+	if got, want := skills[0].DisabledIssue, "link target does not exist"; got != want {
+		t.Fatalf("broken skill issue: got %q, want %q", got, want)
+	}
 }
 
 func TestScanMissingDirectories(t *testing.T) {
