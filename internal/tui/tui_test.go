@@ -1,18 +1,37 @@
 package tui
 
 import (
+	"image/color"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	bubbletea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/Kklyee/skiller/internal/catalog"
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/paths"
-	bubbletea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
+
+func keyText(text string) bubbletea.KeyPressMsg {
+	runes := []rune(text)
+	var code rune
+	if len(runes) > 0 {
+		code = runes[0]
+	}
+	return bubbletea.KeyPressMsg{Text: text, Code: code}
+}
+
+func keyCode(code rune) bubbletea.KeyPressMsg {
+	return bubbletea.KeyPressMsg{Code: code}
+}
+
+func viewText(model *Model) string {
+	return ansi.Strip(model.View().Content)
+}
 
 func TestMainViewAndKeyboardInteractions(t *testing.T) {
 	root := t.TempDir()
@@ -40,22 +59,22 @@ func TestMainViewAndKeyboardInteractions(t *testing.T) {
 		t.Fatalf("new model: %v", err)
 	}
 	model.Update(bubbletea.WindowSizeMsg{Width: 120, Height: 30})
-	view := model.View()
+	view := viewText(&model)
 	for _, want := range []string{"Skiller", "alpha", "beta", "coding", "Details", "active", "disabled"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("view missing %q:\n%s", want, view)
 		}
 	}
 
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'/'}})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune("beta")})
+	model.Update(keyText("/"))
+	model.Update(keyText("beta"))
 	if got := len(model.visibleSkills()); got != 1 || model.visibleSkills()[0].ID != "beta" {
 		t.Fatalf("search results: %+v", model.visibleSkills())
 	}
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEsc})
+	model.Update(keyCode(bubbletea.KeyEsc))
 
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyTab})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{' '}})
+	model.Update(keyCode(bubbletea.KeyTab))
+	model.Update(keyText(" "))
 	if skills, err := scanForTest(activeDir, disabledDir); err != nil {
 		t.Fatalf("scan toggled skills: %v", err)
 	} else if skills[0].State != catalog.StateActive || skills[1].State != catalog.StateActive {
@@ -73,14 +92,14 @@ func TestMainViewAndKeyboardInteractions(t *testing.T) {
 		t.Fatalf("reload model: %v", err)
 	}
 	model.Update(bubbletea.WindowSizeMsg{Width: 120, Height: 30})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'d'}})
-	if !strings.Contains(model.View(), "Skiller / Doctor") {
-		t.Fatalf("doctor screen missing:\n%s", model.View())
+	model.Update(keyText("d"))
+	if !strings.Contains(viewText(&model), "Skiller / Doctor") {
+		t.Fatalf("doctor screen missing:\n%s", viewText(&model))
 	}
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEsc})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'g'}})
-	if !strings.Contains(model.View(), "Skiller / Groups") {
-		t.Fatalf("groups screen missing:\n%s", model.View())
+	model.Update(keyCode(bubbletea.KeyEsc))
+	model.Update(keyText("g"))
+	if !strings.Contains(viewText(&model), "Skiller / Groups") {
+		t.Fatalf("groups screen missing:\n%s", viewText(&model))
 	}
 }
 
@@ -102,7 +121,7 @@ func TestSpaceOnlyTogglesSkillsWhenSkillsFocused(t *testing.T) {
 		t.Fatalf("new model: %v", err)
 	}
 
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{' '}})
+	model.Update(keyText(" "))
 	skills, err := scanForTest(activeDir, disabledDir)
 	if err != nil {
 		t.Fatalf("scan after groups-focused space: %v", err)
@@ -111,8 +130,8 @@ func TestSpaceOnlyTogglesSkillsWhenSkillsFocused(t *testing.T) {
 		t.Fatalf("groups-focused space changed alpha to %s", skills[0].State)
 	}
 
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyTab})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{' '}})
+	model.Update(keyCode(bubbletea.KeyTab))
+	model.Update(keyText(" "))
 	skills, err = scanForTest(activeDir, disabledDir)
 	if err != nil {
 		t.Fatalf("scan after skills-focused space: %v", err)
@@ -139,12 +158,12 @@ func TestSkillsFocusATogglesAllVisibleSkills(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new model: %v", err)
 	}
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyTab})
-	if footer := model.viewFooter(); !strings.Contains(footer, "a all") {
+	model.Update(keyCode(bubbletea.KeyTab))
+	if footer := ansi.Strip(model.viewFooter()); !strings.Contains(footer, "a all") {
 		t.Fatalf("skills footer missing select-all action:\n%s", footer)
 	}
 
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'a'}})
+	model.Update(keyText("a"))
 	if skills, err := scanForTest(activeDir, disabledDir); err != nil {
 		t.Fatalf("scan after activate all: %v", err)
 	} else {
@@ -155,7 +174,7 @@ func TestSkillsFocusATogglesAllVisibleSkills(t *testing.T) {
 		}
 	}
 
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'a'}})
+	model.Update(keyText("a"))
 	if skills, err := scanForTest(activeDir, disabledDir); err != nil {
 		t.Fatalf("scan after disable all: %v", err)
 	} else {
@@ -185,15 +204,15 @@ func TestGroupFocusEnterOpensGroupsPage(t *testing.T) {
 		t.Fatalf("new model: %v", err)
 	}
 
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyDown})
-	footer := model.viewFooter()
+	model.Update(keyCode(bubbletea.KeyDown))
+	footer := ansi.Strip(model.viewFooter())
 	if strings.Contains(footer, "space toggle") {
 		t.Fatalf("groups footer advertises skill toggle:\n%s", footer)
 	}
 	if !strings.Contains(footer, "enter groups") {
 		t.Fatalf("groups footer missing groups action:\n%s", footer)
 	}
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEnter})
+	model.Update(keyCode(bubbletea.KeyEnter))
 
 	if model.screen != ScreenGroups {
 		t.Fatalf("screen after groups-focused enter = %v, want groups", model.screen)
@@ -201,8 +220,8 @@ func TestGroupFocusEnterOpensGroupsPage(t *testing.T) {
 	if model.detailExpanded {
 		t.Fatal("groups-focused enter expanded skill details")
 	}
-	if !strings.Contains(model.View(), "Skiller / Groups") {
-		t.Fatalf("groups page missing after enter:\n%s", model.View())
+	if !strings.Contains(viewText(&model), "Skiller / Groups") {
+		t.Fatalf("groups page missing after enter:\n%s", viewText(&model))
 	}
 }
 
@@ -223,7 +242,7 @@ func TestConflictFromExternalInstallerIsVisible(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new model: %v", err)
 	}
-	view := model.View()
+	view := viewText(&model)
 	for _, want := range []string{"Conflict 1", "research", "conflict", "!"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("view missing %q:\n%s", want, view)
@@ -256,15 +275,15 @@ func TestReconcileModalAppliesGroup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new model: %v", err)
 	}
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyDown})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'u'}})
+	model.Update(keyCode(bubbletea.KeyDown))
+	model.Update(keyText("u"))
 	if model.modal != modalReconcile {
 		t.Fatal("expected reconcile modal")
 	}
-	if !strings.Contains(model.View(), "Enable") || !strings.Contains(model.View(), "Disable") {
-		t.Fatalf("reconcile plan missing:\n%s", model.View())
+	if !strings.Contains(viewText(&model), "Enable") || !strings.Contains(viewText(&model), "Disable") {
+		t.Fatalf("reconcile plan missing:\n%s", viewText(&model))
 	}
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEnter})
+	model.Update(keyCode(bubbletea.KeyEnter))
 	if model.modal != modalNone {
 		t.Fatal("reconcile modal did not close")
 	}
@@ -291,14 +310,14 @@ func TestResponsiveDetailsAndMinimumSize(t *testing.T) {
 		t.Fatalf("new model: %v", err)
 	}
 	model.Update(bubbletea.WindowSizeMsg{Width: 70, Height: 20})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyTab})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEnter})
-	if !strings.Contains(model.View(), "Description") {
-		t.Fatalf("expanded details missing:\n%s", model.View())
+	model.Update(keyCode(bubbletea.KeyTab))
+	model.Update(keyCode(bubbletea.KeyEnter))
+	if !strings.Contains(viewText(&model), "Description") {
+		t.Fatalf("expanded details missing:\n%s", viewText(&model))
 	}
 	model.Update(bubbletea.WindowSizeMsg{Width: 40, Height: 20})
-	if !strings.Contains(model.View(), "Terminal too small") {
-		t.Fatalf("minimum size message missing:\n%s", model.View())
+	if !strings.Contains(viewText(&model), "Terminal too small") {
+		t.Fatalf("minimum size message missing:\n%s", viewText(&model))
 	}
 }
 
@@ -328,7 +347,7 @@ func TestDetailsPanelIsReadOnlySummary(t *testing.T) {
 		t.Fatalf("new model: %v", err)
 	}
 
-	if got, want := strings.Split(model.viewDetailsPanel(), "\n"), []string{
+	if got, want := strings.Split(ansi.Strip(model.viewDetailsPanel()), "\n"), []string{
 		"Name: Alpha",
 		"Description: First skill",
 		"Status: active",
@@ -337,22 +356,22 @@ func TestDetailsPanelIsReadOnlySummary(t *testing.T) {
 		t.Fatalf("details panel = %q, want %q", got, want)
 	}
 
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyTab})
+	model.Update(keyCode(bubbletea.KeyTab))
 	if model.focus != FocusSkills {
 		t.Fatalf("first tab focus = %v, want skills", model.focus)
 	}
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEnter})
+	model.Update(keyCode(bubbletea.KeyEnter))
 	if model.focus != FocusSkills {
 		t.Fatalf("enter focus = %v, want skills", model.focus)
 	}
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyTab})
+	model.Update(keyCode(bubbletea.KeyTab))
 	if model.focus != FocusGroups {
 		t.Fatalf("second tab focus = %v, want groups", model.focus)
 	}
 }
 
 func TestSkillStateBadgesUseSemanticColors(t *testing.T) {
-	want := map[catalog.State]lipgloss.Color{
+	want := map[catalog.State]color.Color{
 		catalog.StateActive:   lipgloss.Color("10"),
 		catalog.StateDisabled: lipgloss.Color("8"),
 		catalog.StateConflict: lipgloss.Color("9"),
@@ -386,24 +405,24 @@ func TestCreatingGroupOpensSkillSelector(t *testing.T) {
 		t.Fatalf("new model: %v", err)
 	}
 
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'g'}})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'n'}})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune("coding")})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEnter})
+	model.Update(keyText("g"))
+	model.Update(keyText("n"))
+	model.Update(keyText("coding"))
+	model.Update(keyCode(bubbletea.KeyEnter))
 
 	if model.screen != ScreenGroupEditor {
 		t.Fatalf("screen after group creation = %v, want group editor", model.screen)
 	}
 	for _, want := range []string{"Edit Group: coding", "alpha", "beta", "[ ]"} {
-		if !strings.Contains(model.View(), want) {
-			t.Fatalf("selector missing %q:\n%s", want, model.View())
+		if !strings.Contains(viewText(&model), want) {
+			t.Fatalf("selector missing %q:\n%s", want, viewText(&model))
 		}
 	}
 
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{' '}})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyDown})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{' '}})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEnter})
+	model.Update(keyText(" "))
+	model.Update(keyCode(bubbletea.KeyDown))
+	model.Update(keyText(" "))
+	model.Update(keyCode(bubbletea.KeyEnter))
 
 	created, err := group.New(groupsDir).Get("coding")
 	if err != nil {
@@ -432,12 +451,12 @@ func TestGroupEditorSelectsAllSkillsWithA(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new model: %v", err)
 	}
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'g'}})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'n'}})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune("coding")})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEnter})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'a'}})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEnter})
+	model.Update(keyText("g"))
+	model.Update(keyText("n"))
+	model.Update(keyText("coding"))
+	model.Update(keyCode(bubbletea.KeyEnter))
+	model.Update(keyText("a"))
+	model.Update(keyCode(bubbletea.KeyEnter))
 
 	created, err := group.New(groupsDir).Get("coding")
 	if err != nil {
@@ -466,14 +485,14 @@ func TestMainLayoutUsesSingleTableHeader(t *testing.T) {
 	model.Update(bubbletea.WindowSizeMsg{Width: 120, Height: 30})
 
 	var header string
-	for _, line := range strings.Split(model.View(), "\n") {
+	for _, line := range strings.Split(viewText(&model), "\n") {
 		if strings.Contains(line, "Groups") && strings.Contains(line, "Skills") && strings.Contains(line, "Details") {
 			header = line
 			break
 		}
 	}
 	if header == "" {
-		t.Fatalf("single table header is missing:\n%s", model.View())
+		t.Fatalf("single table header is missing:\n%s", viewText(&model))
 	}
 	for _, border := range []string{"╭", "╮", "╰", "╯", "│"} {
 		if strings.Contains(header, border) {
@@ -504,15 +523,15 @@ func TestEmptyGroupNameKeepsCreationDialogOpen(t *testing.T) {
 		t.Fatalf("new model: %v", err)
 	}
 
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'g'}})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'n'}})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEnter})
+	model.Update(keyText("g"))
+	model.Update(keyText("n"))
+	model.Update(keyCode(bubbletea.KeyEnter))
 
 	if model.modal != modalGroupName {
 		t.Fatalf("modal after empty group name = %v, want group name dialog", model.modal)
 	}
-	if !strings.Contains(model.View(), "Group name is required") {
-		t.Fatalf("validation message missing:\n%s", model.View())
+	if !strings.Contains(viewText(&model), "Group name is required") {
+		t.Fatalf("validation message missing:\n%s", viewText(&model))
 	}
 }
 
@@ -539,17 +558,17 @@ func TestReconcileIssuesKeepPreviewOpen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new model: %v", err)
 	}
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'g'}})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyDown})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEsc})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'u'}})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEnter})
+	model.Update(keyText("g"))
+	model.Update(keyCode(bubbletea.KeyDown))
+	model.Update(keyCode(bubbletea.KeyEsc))
+	model.Update(keyText("u"))
+	model.Update(keyCode(bubbletea.KeyEnter))
 
 	if model.modal != modalReconcile {
 		t.Fatalf("modal after blocked reconcile = %v, want reconcile preview", model.modal)
 	}
-	if !strings.Contains(model.View(), "Cannot apply") {
-		t.Fatalf("blocked reconcile message missing:\n%s", model.View())
+	if !strings.Contains(viewText(&model), "Cannot apply") {
+		t.Fatalf("blocked reconcile message missing:\n%s", viewText(&model))
 	}
 }
 
@@ -568,21 +587,21 @@ func TestTUIShowsContextualKeyboardHints(t *testing.T) {
 		t.Fatalf("new model: %v", err)
 	}
 
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'/'}})
-	if view := model.View(); !strings.Contains(view, "finish search") || !strings.Contains(view, "cancel") {
+	model.Update(keyText("/"))
+	if view := viewText(&model); !strings.Contains(view, "finish search") || !strings.Contains(view, "cancel") {
 		t.Fatalf("search hints missing:\n%s", view)
 	}
 
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyEsc})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'g'}})
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyRunes, Runes: []rune{'n'}})
-	if view := model.View(); !strings.Contains(view, "type name") || !strings.Contains(view, "create") {
+	model.Update(keyCode(bubbletea.KeyEsc))
+	model.Update(keyText("g"))
+	model.Update(keyText("n"))
+	if view := viewText(&model); !strings.Contains(view, "type name") || !strings.Contains(view, "create") {
 		t.Fatalf("group creation hints missing:\n%s", view)
 	}
 }
 
 func TestMessageStylesUseSemanticColors(t *testing.T) {
-	want := map[messageKind]lipgloss.Color{
+	want := map[messageKind]color.Color{
 		messageInfo:    lipgloss.Color("11"),
 		messageSuccess: lipgloss.Color("10"),
 		messageError:   lipgloss.Color("9"),
@@ -596,12 +615,12 @@ func TestMessageStylesUseSemanticColors(t *testing.T) {
 }
 
 func TestEditorSelectionStylesUseSemanticColors(t *testing.T) {
-	want := map[string]lipgloss.TerminalColor{
+	want := map[string]color.Color{
 		"selected":   lipgloss.Color("10"),
 		"unselected": lipgloss.Color("8"),
 		"cursor":     lipgloss.Color("6"),
 	}
-	got := map[string]lipgloss.TerminalColor{
+	got := map[string]color.Color{
 		"selected":   editorSelectedStyle().GetForeground(),
 		"unselected": editorUnselectedStyle().GetForeground(),
 		"cursor":     editorCursorStyle().GetForeground(),
@@ -629,12 +648,12 @@ func TestFocusedPanelsHaveVisibleBorders(t *testing.T) {
 	}
 	model.Update(bubbletea.WindowSizeMsg{Width: 120, Height: 30})
 
-	if got := strings.Count(model.View(), "╭"); got != 1 {
-		t.Fatalf("groups focus border count = %d, want 1:\n%s", got, model.View())
+	if got := strings.Count(viewText(&model), "╭"); got != 1 {
+		t.Fatalf("groups focus border count = %d, want 1:\n%s", got, viewText(&model))
 	}
-	model.Update(bubbletea.KeyMsg{Type: bubbletea.KeyTab})
-	if got := strings.Count(model.View(), "╭"); got != 1 {
-		t.Fatalf("skills focus border count = %d, want 1:\n%s", got, model.View())
+	model.Update(keyCode(bubbletea.KeyTab))
+	if got := strings.Count(viewText(&model), "╭"); got != 1 {
+		t.Fatalf("skills focus border count = %d, want 1:\n%s", got, viewText(&model))
 	}
 }
 
@@ -670,7 +689,7 @@ func TestGroupsShowCurrentlyActiveGroup(t *testing.T) {
 		t.Fatalf("new model: %v", err)
 	}
 
-	view := model.viewGroupPanel()
+	view := ansi.Strip(model.viewGroupPanel())
 	if !strings.Contains(view, "● coding") {
 		t.Fatalf("active group marker missing:\n%s", view)
 	}

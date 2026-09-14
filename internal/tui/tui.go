@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 
+	bubbletea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/Kklyee/skiller/internal/catalog"
 	"github.com/Kklyee/skiller/internal/doctor"
 	"github.com/Kklyee/skiller/internal/group"
@@ -12,8 +14,6 @@ import (
 	"github.com/Kklyee/skiller/internal/reconcile"
 	"github.com/Kklyee/skiller/internal/transaction"
 	"github.com/Kklyee/skiller/internal/visibility"
-	bubbletea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 type Screen uint8
@@ -119,7 +119,7 @@ func Run(pathSet paths.Set) error {
 		return err
 	}
 
-	_, err = bubbletea.NewProgram(&model, bubbletea.WithAltScreen()).Run()
+	_, err = bubbletea.NewProgram(&model).Run()
 	return err
 }
 
@@ -132,14 +132,20 @@ func (m *Model) Update(message bubbletea.Msg) (bubbletea.Model, bubbletea.Cmd) {
 	case bubbletea.WindowSizeMsg:
 		m.width = message.Width
 		m.height = message.Height
-	case bubbletea.KeyMsg:
+	case bubbletea.KeyPressMsg:
 		return m, m.updateKey(message)
 	}
 
 	return m, nil
 }
 
-func (m *Model) View() string {
+func (m *Model) View() bubbletea.View {
+	view := bubbletea.NewView(m.viewContent())
+	view.AltScreen = true
+	return view
+}
+
+func (m *Model) viewContent() string {
 	if m.width < 60 || m.height < 8 {
 		return "Terminal too small. Resize to at least 60x8.\n"
 	}
@@ -189,7 +195,7 @@ func (m *Model) refresh() error {
 	return nil
 }
 
-func (m *Model) updateKey(message bubbletea.KeyMsg) bubbletea.Cmd {
+func (m *Model) updateKey(message bubbletea.KeyPressMsg) bubbletea.Cmd {
 	if m.modal != modalNone {
 		return m.updateModal(message)
 	}
@@ -226,7 +232,7 @@ func (m *Model) updateKey(message bubbletea.KeyMsg) bubbletea.Cmd {
 		m.moveSelection(-1)
 	case "down", "j":
 		m.moveSelection(1)
-	case " ":
+	case "space":
 		if m.focus == FocusSkills {
 			m.toggleSelectedSkill()
 		}
@@ -264,26 +270,26 @@ func (m *Model) updateKey(message bubbletea.KeyMsg) bubbletea.Cmd {
 	return nil
 }
 
-func (m *Model) updateSearch(message bubbletea.KeyMsg) bubbletea.Cmd {
-	switch message.Type {
-	case bubbletea.KeyEsc:
+func (m *Model) updateSearch(message bubbletea.KeyPressMsg) bubbletea.Cmd {
+	switch message.String() {
+	case "esc":
 		m.searchActive = false
 		m.search = ""
-	case bubbletea.KeyEnter:
+	case "enter":
 		m.searchActive = false
-	case bubbletea.KeyBackspace, bubbletea.KeyDelete:
+	case "backspace", "delete":
 		runes := []rune(m.search)
 		if len(runes) > 0 {
 			m.search = string(runes[:len(runes)-1])
 		}
-	case bubbletea.KeyRunes:
-		m.search += string(message.Runes)
+	default:
+		m.search += message.Text
 	}
 	m.normalizeSelection()
 	return nil
 }
 
-func (m *Model) updateGroups(message bubbletea.KeyMsg, key string) bubbletea.Cmd {
+func (m *Model) updateGroups(message bubbletea.KeyPressMsg, key string) bubbletea.Cmd {
 	switch key {
 	case "ctrl+c", "q":
 		return bubbletea.Quit
@@ -309,7 +315,7 @@ func (m *Model) updateGroups(message bubbletea.KeyMsg, key string) bubbletea.Cmd
 	return nil
 }
 
-func (m *Model) updateEditor(message bubbletea.KeyMsg) bubbletea.Cmd {
+func (m *Model) updateEditor(message bubbletea.KeyPressMsg) bubbletea.Cmd {
 	key := message.String()
 	switch key {
 	case "esc":
@@ -323,7 +329,7 @@ func (m *Model) updateEditor(message bubbletea.KeyMsg) bubbletea.Cmd {
 		if m.editorIndex+1 < len(m.editorSkills) {
 			m.editorIndex++
 		}
-	case " ":
+	case "space":
 		if len(m.editorSkills) > 0 {
 			id := m.editorSkills[m.editorIndex]
 			m.editorChosen[id] = !m.editorChosen[id]
@@ -338,7 +344,7 @@ func (m *Model) updateEditor(message bubbletea.KeyMsg) bubbletea.Cmd {
 	return nil
 }
 
-func (m *Model) updateModal(message bubbletea.KeyMsg) bubbletea.Cmd {
+func (m *Model) updateModal(message bubbletea.KeyPressMsg) bubbletea.Cmd {
 	key := message.String()
 	if m.modal == modalReconcile {
 		if key == "esc" {
@@ -366,11 +372,11 @@ func (m *Model) updateModal(message bubbletea.KeyMsg) bubbletea.Cmd {
 	}
 
 	if m.modal == modalGroupName {
-		switch message.Type {
-		case bubbletea.KeyEsc:
+		switch message.String() {
+		case "esc":
 			m.modal = modalNone
 			m.clearMessage()
-		case bubbletea.KeyEnter:
+		case "enter":
 			name := strings.TrimSpace(m.input)
 			if name == "" {
 				m.setMessage(messageInfo, "Group name is required")
@@ -388,13 +394,13 @@ func (m *Model) updateModal(message bubbletea.KeyMsg) bubbletea.Cmd {
 				m.openEditor()
 			}
 			m.modal = modalNone
-		case bubbletea.KeyBackspace, bubbletea.KeyDelete:
+		case "backspace", "delete":
 			runes := []rune(m.input)
 			if len(runes) > 0 {
 				m.input = string(runes[:len(runes)-1])
 			}
-		case bubbletea.KeyRunes:
-			m.input += string(message.Runes)
+		default:
+			m.input += message.Text
 		}
 		return nil
 	}

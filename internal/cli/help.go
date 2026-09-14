@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/spf13/cobra"
 )
 
@@ -22,14 +22,13 @@ func configureHelp(command *cobra.Command) {
 	command.SetUsageFunc(renderUsage)
 }
 
-func newHelpPalette(output io.Writer) helpPalette {
-	renderer := lipgloss.NewRenderer(output)
+func newHelpPalette(_ io.Writer) helpPalette {
 	return helpPalette{
-		heading:  lipgloss.NewStyle().Renderer(renderer).Bold(true).Foreground(lipgloss.Color("6")),
-		command:  lipgloss.NewStyle().Renderer(renderer).Bold(true).Foreground(lipgloss.Color("10")),
-		argument: lipgloss.NewStyle().Renderer(renderer).Foreground(lipgloss.Color("11")),
-		flag:     lipgloss.NewStyle().Renderer(renderer).Foreground(lipgloss.Color("13")),
-		hint:     lipgloss.NewStyle().Renderer(renderer).Foreground(lipgloss.Color("8")),
+		heading:  lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")),
+		command:  lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10")),
+		argument: lipgloss.NewStyle().Foreground(lipgloss.Color("11")),
+		flag:     lipgloss.NewStyle().Foreground(lipgloss.Color("13")),
+		hint:     lipgloss.NewStyle().Foreground(lipgloss.Color("8")),
 	}
 }
 

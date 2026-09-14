@@ -2,12 +2,13 @@ package cli
 
 import (
 	"bytes"
+	"image/color"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 func TestRootCommandRejectsUnfinishedJournal(t *testing.T) {
@@ -50,7 +51,7 @@ func TestRootVersionFlag(t *testing.T) {
 
 func TestHelpPaletteUsesSemanticColors(t *testing.T) {
 	palette := newHelpPalette(&bytes.Buffer{})
-	want := map[string]lipgloss.TerminalColor{
+	want := map[string]color.Color{
 		"heading":  lipgloss.Color("6"),
 		"command":  lipgloss.Color("10"),
 		"argument": lipgloss.Color("11"),
@@ -58,7 +59,7 @@ func TestHelpPaletteUsesSemanticColors(t *testing.T) {
 		"hint":     lipgloss.Color("8"),
 	}
 
-	got := map[string]lipgloss.TerminalColor{
+	got := map[string]color.Color{
 		"heading":  palette.heading.GetForeground(),
 		"command":  palette.command.GetForeground(),
 		"argument": palette.argument.GetForeground(),
