@@ -746,19 +746,14 @@ func (m *Model) viewHeader() string {
 		groupName = m.selectedGroup
 	}
 	header := fmt.Sprintf(
-		"Skiller  Installed %d  Active %d  Disabled %d  Conflict %d  Broken %d  Invalid %d  Group: %s  Using: ",
+		"Skiller  Installed %d  Active %d  Disabled %d  Conflict %d  Group: %s",
 		m.summary.Installed,
 		m.summary.Active,
 		m.summary.Disabled,
 		m.summary.Conflict,
-		m.summary.Broken,
-		m.summary.Invalid,
 		groupName,
 	)
-	if m.activeGroup == "" {
-		return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render(header) + helpTextStyle().Render("-")
-	}
-	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render(header) + stateStyle(catalog.StateActive).Render("● "+m.activeGroup)
+	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render(header)
 }
 
 func (m *Model) viewGroupPanel() string {

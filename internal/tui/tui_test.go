@@ -554,8 +554,16 @@ func TestGroupsShowCurrentlyActiveGroup(t *testing.T) {
 	if strings.Contains(view, "● other") {
 		t.Fatalf("inactive group was marked active:\n%s", view)
 	}
-	if header := model.viewHeader(); !strings.Contains(header, "Using: ") || !strings.Contains(header, "● coding") {
-		t.Fatalf("active group header missing:\n%s", header)
+	header := model.viewHeader()
+	for _, want := range []string{"Installed", "Active", "Disabled", "Conflict", "Group:"} {
+		if !strings.Contains(header, want) {
+			t.Fatalf("header missing %q:\n%s", want, header)
+		}
+	}
+	for _, unwanted := range []string{"Broken", "Invalid", "Using:", "● coding"} {
+		if strings.Contains(header, unwanted) {
+			t.Fatalf("header contains unwanted %q:\n%s", unwanted, header)
+		}
 	}
 }
 
