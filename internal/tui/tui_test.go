@@ -186,6 +186,52 @@ func TestMainColumnWidthsConstrainLargePanels(t *testing.T) {
 	}
 }
 
+func TestMainLogoOccupiesItsOwnRowAboveSummary(t *testing.T) {
+	root := t.TempDir()
+	model, err := NewModel(paths.Set{
+		Active:   filepath.Join(root, "active"),
+		Disabled: filepath.Join(root, "disabled"),
+		Groups:   filepath.Join(root, "groups"),
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+
+	lines := strings.Split(viewText(&model), "\n")
+	logoIndex := -1
+	headerIndex := -1
+	for index, line := range lines {
+		if strings.Contains(line, "◆ SKILLER") {
+			logoIndex = index
+		}
+		if strings.Contains(line, "Installed") {
+			headerIndex = index
+		}
+	}
+	if logoIndex < 0 || headerIndex != logoIndex+1 {
+		t.Fatalf("logo/header rows are not stacked: logo=%d header=%d\n%s", logoIndex, headerIndex, viewText(&model))
+	}
+}
+
+func TestMainPanelsReserveTheSameContentColumnAcrossFocus(t *testing.T) {
+	column := mainColumn{content: "content", width: 30}
+	focused := ansi.Strip(mainColumnBody(mainColumn{content: column.content, width: column.width, focused: true}, 8))
+	unfocused := ansi.Strip(mainColumnBody(mainColumn{content: column.content, width: column.width, focused: false}, 8))
+	contentColumn := func(view string) int {
+		for _, line := range strings.Split(view, "\n") {
+			if index := strings.Index(line, "content"); index >= 0 {
+				return index
+			}
+		}
+		return -1
+	}
+	if got, want := contentColumn(focused), contentColumn(unfocused); got != want {
+		t.Fatalf("panel content moved between focus states: focused=%d unfocused=%d", got, want)
+	}
+}
+
 func TestSkillRowsUseIconsWithoutRepeatedStateLabels(t *testing.T) {
 	root := t.TempDir()
 	activeDir := filepath.Join(root, "active")

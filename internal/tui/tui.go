@@ -834,7 +834,7 @@ func (m *Model) openDeleteGroup() {
 
 func (m *Model) viewMain() string {
 	header := m.viewHeader()
-	bodyHeight := m.height - 7
+	bodyHeight := m.height - 8
 	if bodyHeight < 3 {
 		bodyHeight = 3
 	}
@@ -843,6 +843,7 @@ func (m *Model) viewMain() string {
 	showDetails := detailsWidth >= 24 && m.width >= 90
 	if showDetails {
 		return strings.Join([]string{
+			m.viewBrand(),
 			header,
 			m.mainColumns([]mainColumn{
 				{title: "Groups", content: m.viewGroupPanel(), width: groupWidth, focused: m.focus == FocusGroups},
@@ -854,6 +855,7 @@ func (m *Model) viewMain() string {
 	}
 	if m.detailExpanded {
 		return strings.Join([]string{
+			m.viewBrand(),
 			header,
 			m.mainColumns([]mainColumn{{title: "Details", content: m.viewDetailsPanel(), width: m.width}}, bodyHeight),
 			m.viewFooter(),
@@ -862,6 +864,7 @@ func (m *Model) viewMain() string {
 
 	usableSkillsWidth := m.width - groupWidth
 	return strings.Join([]string{
+		m.viewBrand(),
 		header,
 		m.mainColumns([]mainColumn{
 			{title: "Groups", content: m.viewGroupPanel(), width: groupWidth, focused: m.focus == FocusGroups},
@@ -910,27 +913,30 @@ func (m *Model) mainColumns(columns []mainColumn, height int) string {
 }
 
 func mainColumnBody(column mainColumn, height int) string {
-	style := lipgloss.NewStyle().Width(column.width).Height(height)
-	if column.focused {
-		contentWidth := column.width - 2
-		if contentWidth < 1 {
-			contentWidth = 1
-		}
-		contentHeight := height - 2
-		if contentHeight < 1 {
-			contentHeight = 1
-		}
-		style = lipgloss.NewStyle().
-			Width(contentWidth).
-			Height(contentHeight).
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("6"))
+	contentWidth := column.width - 2
+	if contentWidth < 1 {
+		contentWidth = 1
 	}
+	contentHeight := height - 2
+	if contentHeight < 1 {
+		contentHeight = 1
+	}
+	border := lipgloss.NormalBorder()
+	borderColor := lipgloss.Color("8")
+	if column.focused {
+		border = lipgloss.RoundedBorder()
+		borderColor = lipgloss.Color("6")
+	}
+	style := lipgloss.NewStyle().
+		Width(contentWidth).
+		Height(contentHeight).
+		Border(border).
+		BorderForeground(borderColor)
 	return style.Render(column.content)
 }
 
 func mainColumnHeader(title string, width int, focused bool) string {
-	style := lipgloss.NewStyle().Width(width).Bold(true).Foreground(lipgloss.Color("8"))
+	style := lipgloss.NewStyle().Width(width).PaddingLeft(1).Bold(true).Foreground(lipgloss.Color("8"))
 	if focused {
 		style = style.Foreground(lipgloss.Color("6")).Underline(true)
 	}
@@ -943,7 +949,6 @@ func (m *Model) viewHeader() string {
 		groupName = m.selectedGroup
 	}
 	parts := []string{
-		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("◆ SKILLER"),
 		headerMetric("Installed", m.summary.Installed, "6"),
 		headerMetric("Active", m.summary.Active, "10"),
 		headerMetric("Disabled", m.summary.Disabled, "8"),
@@ -951,6 +956,10 @@ func (m *Model) viewHeader() string {
 		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Group: " + groupName),
 	}
 	return strings.Join(parts, "  ")
+}
+
+func (m *Model) viewBrand() string {
+	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("◆ SKILLER")
 }
 
 func headerMetric(label string, value int, color string) string {
