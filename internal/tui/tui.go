@@ -307,6 +307,8 @@ func (m *Model) updateGroups(message bubbletea.KeyPressMsg, key string) bubblete
 		m.openEditor()
 	case "d":
 		m.openDeleteGroup()
+	case "u":
+		m.openReconcile()
 	case "enter":
 		if m.selectedGroup != "" {
 			m.screen = ScreenGroupDetails
@@ -1022,35 +1024,32 @@ func (m *Model) viewFooter() string {
 }
 
 func (m *Model) viewGroups() string {
-	lines := []string{"Groups", ""}
-	for _, group := range m.groups {
-		prefix := "  "
-		if group.Name == m.selectedGroup {
-			prefix = "> "
-		}
-		lines = append(lines, fmt.Sprintf("%s%-32s %d skills", prefix, group.Name, len(group.Skills)))
-		if len(group.Missing) > 0 {
-			lines = append(lines, "    missing: "+strings.Join(group.Missing, ", "))
-		}
+	body := m.viewGroupManagerList()
+	details := m.viewGroupManagerDetails()
+	leftWidth := m.width / 4
+	if leftWidth < 28 {
+		leftWidth = 28
 	}
-	if len(m.groups) == 0 {
-		lines = append(lines, "  No groups")
+	if leftWidth > 36 {
+		leftWidth = 36
 	}
-	body := strings.Join(lines, "\n")
-	if m.modal == modalGroupName {
-		body += "\n\nNew group name: " + m.input + "_"
+	if leftWidth > m.width-24 {
+		leftWidth = m.width - 24
 	}
-	if m.modal == modalDeleteGroup {
-		body += "\n\nDelete group " + m.deleteGroup + "? enter/y confirm, esc/n cancel"
+	if leftWidth < 4 {
+		leftWidth = 4
 	}
-	if m.message != "" {
-		body += "\n\n" + m.renderedMessage()
+	rightWidth := m.width - leftWidth
+	panelHeight := m.height - 3
+	if panelHeight < 3 {
+		panelHeight = 3
 	}
 	footer := renderKeyHints(
 		keyHint{key: "↑↓/jk", description: "move"},
 		keyHint{key: "n", description: "new"},
 		keyHint{key: "e", description: "edit"},
 		keyHint{key: "d", description: "delete"},
+		keyHint{key: "u", description: "use"},
 		keyHint{key: "enter", description: "inspect"},
 		keyHint{key: "esc", description: "back"},
 	)
@@ -1068,9 +1067,100 @@ func (m *Model) viewGroups() string {
 	}
 	return strings.Join([]string{
 		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Groups"),
-		m.panel("Groups", body, m.width, m.height-3, true),
+		lipgloss.JoinHorizontal(
+			lipgloss.Top,
+			m.panel("Groups", body, leftWidth, panelHeight, true),
+			m.panel(m.groupManagerTitle(), details, rightWidth, panelHeight, false),
+		),
 		footer,
 	}, "\n")
+}
+
+func (m *Model) viewGroupManagerList() string {
+	lines := make([]string, 0, len(m.groups)+4)
+	for _, group := range m.groups {
+		prefix := "  "
+		if group.Name == m.selectedGroup {
+			prefix = "> "
+		}
+		marker := "  "
+		if group.Name == m.activeGroup {
+			marker = stateStyle(catalog.StateActive).Render("●") + " "
+		}
+		lines = append(lines, prefix+marker+group.Name+fmt.Sprintf("  %d", len(group.Skills)))
+		if len(group.Missing) > 0 {
+			lines = append(lines, helpTextStyle().Render("    missing: "+strings.Join(group.Missing, ", ")))
+		}
+	}
+	if len(m.groups) == 0 {
+		lines = append(lines, "  No groups")
+	}
+	if m.modal == modalGroupName {
+		lines = append(lines, "", "New group name: "+m.input+"_")
+	}
+	if m.modal == modalDeleteGroup {
+		lines = append(lines, "", "Delete group "+m.deleteGroup+"? enter/y confirm, esc/n cancel")
+	}
+	if m.message != "" {
+		lines = append(lines, "", m.renderedMessage())
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (m *Model) groupManagerTitle() string {
+	if group, ok := m.selectedGroupValue(); ok {
+		return group.Name
+	}
+	return "Details"
+}
+
+func (m *Model) viewGroupManagerDetails() string {
+	group, ok := m.selectedGroupValue()
+	if !ok {
+		return helpTextStyle().Render("Select a group to inspect its members")
+	}
+
+	status := helpTextStyle().Render("○ Not applied")
+	if group.Name == m.activeGroup {
+		status = stateStyle(catalog.StateActive).Render("● Applied")
+	}
+	lines := []string{status, "", helpTextStyle().Bold(true).Render("Members")}
+	if len(group.Skills) == 0 {
+		lines = append(lines, helpTextStyle().Render("  No skills"))
+	} else {
+		installed := make(map[string]catalog.Skill, len(m.skills))
+		for _, skill := range m.skills {
+			installed[skill.ID] = skill
+		}
+		for _, id := range group.Skills {
+			skill, ok := installed[id]
+			if !ok {
+				lines = append(lines, messageStyle(messageInfo).Render("? ")+id+" (missing)")
+				continue
+			}
+			lines = append(lines, stateStyle(skill.State).Render(stateIcon(skill.State))+" "+displayName(skill))
+		}
+	}
+
+	plan := reconcile.Build(group, m.skills)
+	lines = append(lines,
+		"",
+		helpTextStyle().Bold(true).Render("Activation Preview"),
+		fmt.Sprintf("Keep %d   Enable %d   Disable %d", len(plan.Keep), len(plan.Enable), len(plan.Disable)),
+	)
+	if plan.HasIssues() {
+		lines = append(lines, messageStyle(messageError).Render("! Resolve issues before use"))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (m *Model) selectedGroupValue() (group.Group, bool) {
+	for _, candidate := range m.groups {
+		if candidate.Name == m.selectedGroup {
+			return candidate, true
+		}
+	}
+	return group.Group{}, false
 }
 
 func (m *Model) viewGroupEditor() string {

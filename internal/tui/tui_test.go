@@ -264,6 +264,48 @@ func TestGroupFocusEnterOpensGroupsPage(t *testing.T) {
 	}
 }
 
+func TestGroupsPageShowsManagerColumnsAndUseAction(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	groupsDir := filepath.Join(root, "groups")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+	createSkill(t, activeDir, "gamma", "Gamma", "Third skill")
+	createSkill(t, disabledDir, "beta", "Beta", "Second skill")
+	store := group.New(groupsDir)
+	if _, err := store.Create("coding"); err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	if _, err := store.Add("coding", "alpha"); err != nil {
+		t.Fatalf("add group skill: %v", err)
+	}
+
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: disabledDir,
+		Groups:   groupsDir,
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(keyText("g"))
+	model.Update(keyCode(bubbletea.KeyDown))
+
+	view := viewText(&model)
+	for _, want := range []string{"Groups", "coding", "Members", "Alpha", "Activation Preview", "Keep 2", "Disable 1", "Not applied"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("groups manager missing %q:\n%s", want, view)
+		}
+	}
+
+	model.Update(keyText("u"))
+	if model.modal != modalReconcile {
+		t.Fatalf("groups-page use did not open reconcile modal: %v", model.modal)
+	}
+}
+
 func TestConflictFromExternalInstallerIsVisible(t *testing.T) {
 	root := t.TempDir()
 	activeDir := filepath.Join(root, "active")
