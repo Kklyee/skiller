@@ -212,6 +212,15 @@ func TestSkillRowsUseIconsWithoutRepeatedStateLabels(t *testing.T) {
 	}
 }
 
+func TestSelectedRowUsesBrandHighlight(t *testing.T) {
+	if got, want := selectedRowStyle().GetForeground(), lipgloss.Color("6"); got != want {
+		t.Fatalf("selected row color = %v, want %v", got, want)
+	}
+	if !selectedRowStyle().GetBold() {
+		t.Fatal("selected row is not bold")
+	}
+}
+
 func TestSpaceOnlyTogglesSkillsWhenSkillsFocused(t *testing.T) {
 	root := t.TempDir()
 	activeDir := filepath.Join(root, "active")

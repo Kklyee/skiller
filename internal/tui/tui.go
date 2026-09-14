@@ -976,7 +976,7 @@ func (m *Model) viewGroupPanel() string {
 	for index := range lines {
 		prefix := "  "
 		if index == selected {
-			prefix = "> "
+			prefix = selectedRowStyle().Render("›") + " "
 		}
 		lines[index] = prefix + lines[index]
 	}
@@ -1023,11 +1023,7 @@ func (m *Model) viewSkillsPanel() string {
 	}
 	lines := make([]string, 0, len(visible))
 	for _, skill := range visible {
-		prefix := "  "
-		if skill.ID == m.selectedSkill {
-			prefix = "> "
-		}
-		lines = append(lines, prefix+stateLine(skill))
+		lines = append(lines, skillRow(skill, skill.ID == m.selectedSkill))
 	}
 	if m.searchActive {
 		lines = append([]string{"Search: " + m.search}, lines...)
@@ -1197,13 +1193,17 @@ func (m *Model) viewGroupManagerList() string {
 	for _, group := range m.groups {
 		prefix := "  "
 		if group.Name == m.selectedGroup {
-			prefix = "> "
+			prefix = selectedRowStyle().Render("›") + " "
 		}
 		marker := "  "
 		if group.Name == m.activeGroup {
 			marker = stateStyle(catalog.StateActive).Render("●") + " "
 		}
-		lines = append(lines, prefix+marker+group.Name+fmt.Sprintf("  %d", len(group.Skills)))
+		name := group.Name
+		if group.Name == m.selectedGroup {
+			name = selectedRowStyle().Render(name)
+		}
+		lines = append(lines, prefix+marker+name+fmt.Sprintf("  %d", len(group.Skills)))
 		if len(group.Missing) > 0 {
 			lines = append(lines, helpTextStyle().Render("    missing: "+strings.Join(group.Missing, ", ")))
 		}
@@ -1440,6 +1440,10 @@ func editorCursorStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6"))
 }
 
+func selectedRowStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6"))
+}
+
 func (m *Model) panel(title, content string, width, height int, focused bool) string {
 	if width < 4 {
 		width = 4
@@ -1457,9 +1461,16 @@ func (m *Model) panel(title, content string, width, height int, focused bool) st
 }
 
 func stateLine(skill catalog.Skill) string {
+	return skillRow(skill, false)
+}
+
+func skillRow(skill catalog.Skill, selected bool) string {
 	name := displayName(skill)
 	if name != skill.ID {
 		name = fmt.Sprintf("%s [%s]", name, skill.ID)
+	}
+	if selected {
+		name = selectedRowStyle().Render(name)
 	}
 	return fmt.Sprintf("%s %s", stateStyle(skill.State).Render(stateIcon(skill.State)), name)
 }
