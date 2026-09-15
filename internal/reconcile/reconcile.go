@@ -88,6 +88,20 @@ func (p Plan) Changes() int {
 	return len(p.Enable) + len(p.Disable)
 }
 
+func (p Plan) FinalActive() []string {
+	ids := slices.Clone(p.Enable)
+	ids = append(ids, p.KeepActive...)
+	slices.Sort(ids)
+	return ids
+}
+
+func (p Plan) FinalDisabled() []string {
+	ids := slices.Clone(p.Disable)
+	ids = append(ids, p.KeepDisabled...)
+	slices.Sort(ids)
+	return ids
+}
+
 func (p Plan) HasIssues() bool {
 	return len(p.Missing) > 0 || len(p.Issues) > 0
 }

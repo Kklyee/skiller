@@ -990,7 +990,7 @@ func TestGroupsPageShowsManagerColumnsAndUseAction(t *testing.T) {
 	model.Update(keyCode(bubbletea.KeyDown))
 
 	view := viewText(&model)
-	for _, want := range []string{"Groups", "coding", "Members", "Alpha", "Activation Preview", "Keep 2", "Disable 1", "Not applied"} {
+	for _, want := range []string{"Groups", "coding", "Members", "Alpha", "Activation Preview", "Active 1", "Disable 2", "Not applied"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("groups manager missing %q:\n%s", want, view)
 		}
@@ -1195,15 +1195,21 @@ func TestReconcileModalAppliesGroup(t *testing.T) {
 	if model.modal != modalReconcile {
 		t.Fatal("expected reconcile modal")
 	}
-	if !strings.Contains(viewText(&model), "Enable") || !strings.Contains(viewText(&model), "Disable") {
-		t.Fatalf("reconcile plan missing:\n%s", viewText(&model))
+	view := viewText(&model)
+	if !strings.Contains(view, "Active (1)") || !strings.Contains(view, "Disable (2)") {
+		t.Fatalf("reconcile plan missing:\n%s", view)
 	}
-	if !strings.Contains(viewText(&model), "Summary") {
-		t.Fatalf("reconcile plan summary missing:\n%s", viewText(&model))
+	if !strings.Contains(view, "Final state") {
+		t.Fatalf("reconcile final state missing:\n%s", view)
 	}
-	for _, want := range []string{"Keep (1)", "disabled (1)", "────"} {
-		if !strings.Contains(viewText(&model), want) {
-			t.Fatalf("reconcile plan section missing %q:\n%s", want, viewText(&model))
+	for _, want := range []string{"wanted", "old", "ignored", "────"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("reconcile plan section missing %q:\n%s", want, view)
+		}
+	}
+	for _, unwanted := range []string{"Enable (", "Keep ("} {
+		if strings.Contains(view, unwanted) {
+			t.Fatalf("reconcile plan contains unwanted section %q:\n%s", unwanted, view)
 		}
 	}
 	model.Update(keyCode(bubbletea.KeyEnter))

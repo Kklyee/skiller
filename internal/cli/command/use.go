@@ -38,7 +38,7 @@ func NewUse() *cobra.Command {
 				return err
 			}
 			plan := reconcile.BuildWithPins(selected, skills, pinned)
-			if err := writePlan(cmd, plan); err != nil {
+			if err := writeActivationPlan(cmd, plan); err != nil {
 				return err
 			}
 			if dryRun {
@@ -129,8 +129,48 @@ func writePlan(cmd *cobra.Command, plan reconcile.Plan) error {
 	return nil
 }
 
+func writeActivationPlan(cmd *cobra.Command, plan reconcile.Plan) error {
+	output := cmd.OutOrStdout()
+	active := plan.FinalActive()
+	disabled := plan.FinalDisabled()
+	if _, err := fmt.Fprintln(output, planContextStyle().Render("Target: "+plan.Group)); err != nil {
+		return fmt.Errorf("write activation plan: %w", err)
+	}
+	if err := writePlanSectionWithHeading(output, "Active", active, "●", planActiveKeepStyle(), planActiveKeepStyle()); err != nil {
+		return err
+	}
+	if err := writePlanSectionWithHeading(output, "Disable", disabled, "○", planDisableStyle(), planDisableStyle()); err != nil {
+		return err
+	}
+	if len(plan.Missing) > 0 {
+		if err := writePlanSection(output, "Missing", plan.Missing, "?", planMissingStyle()); err != nil {
+			return err
+		}
+	}
+	if len(plan.Issues) > 0 {
+		if err := writePlanSection(output, "Issues", plan.Issues, "!", planIssueStyle()); err != nil {
+			return err
+		}
+	}
+
+	if _, err := fmt.Fprintln(output, planHeadingStyle().Render("Final state")); err != nil {
+		return fmt.Errorf("write activation plan: %w", err)
+	}
+	if _, err := fmt.Fprintln(output, strings.Join([]string{
+		planActiveKeepStyle().Render(fmt.Sprintf("%d active", len(active))),
+		planDisableStyle().Render(fmt.Sprintf("%d disable", len(disabled))),
+	}, "  ")); err != nil {
+		return fmt.Errorf("write activation plan: %w", err)
+	}
+	return nil
+}
+
 func writePlanSection(output io.Writer, title string, items []string, marker string, itemStyle lipgloss.Style) error {
-	lines := []string{planHeadingStyle().Render(fmt.Sprintf("%s (%d)", title, len(items)))}
+	return writePlanSectionWithHeading(output, title, items, marker, planHeadingStyle(), itemStyle)
+}
+
+func writePlanSectionWithHeading(output io.Writer, title string, items []string, marker string, headingStyle lipgloss.Style, itemStyle lipgloss.Style) error {
+	lines := []string{headingStyle.Render(fmt.Sprintf("%s (%d)", title, len(items)))}
 	if len(items) == 0 {
 		lines = append(lines, planContextStyle().Render("  (none)"))
 	} else {

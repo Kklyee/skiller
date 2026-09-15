@@ -35,12 +35,17 @@ func TestUseDryRun(t *testing.T) {
 	if err := command.Execute(); err != nil {
 		t.Fatalf("execute dry run: %v", err)
 	}
-	if !strings.Contains(output.String(), "  + wanted") || !strings.Contains(output.String(), "  - old") {
+	if !strings.Contains(output.String(), "  ● wanted") || !strings.Contains(output.String(), "  ○ old") {
 		t.Fatalf("unexpected plan:\n%s", output.String())
 	}
-	for _, want := range []string{"Enable (1)", "Disable (1)", "Keep (0)", "Summary", "1 enable", "1 disable"} {
+	for _, want := range []string{"Active (1)", "Disable (1)", "Final state", "1 active", "1 disable"} {
 		if !strings.Contains(output.String(), want) {
 			t.Fatalf("plan section missing %q:\n%s", want, output.String())
+		}
+	}
+	for _, unwanted := range []string{"Enable (", "Keep ("} {
+		if strings.Contains(output.String(), unwanted) {
+			t.Fatalf("activation plan contains unwanted section %q:\n%s", unwanted, output.String())
 		}
 	}
 	if _, err := os.Stat(filepath.Join(disabledDir, "wanted")); err != nil {
@@ -148,7 +153,7 @@ func TestUseKeepsPinnedSkillsActive(t *testing.T) {
 	if err := command.Execute(); err != nil {
 		t.Fatalf("execute use dry run: %v", err)
 	}
-	if !strings.Contains(output.String(), "  + wanted") || !strings.Contains(output.String(), "  + pinned") || !strings.Contains(output.String(), "  - old") {
+	if !strings.Contains(output.String(), "  ● wanted") || !strings.Contains(output.String(), "  ● pinned") || !strings.Contains(output.String(), "  ○ old") {
 		t.Fatalf("pinned plan missing:\\n%s", output.String())
 	}
 }

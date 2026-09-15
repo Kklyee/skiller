@@ -735,13 +735,14 @@ func (m *Model) viewGroupManagerDetails(width int) string {
 	}
 
 	plan := reconcile.BuildWithPins(group, m.skills, m.pins)
+	active := plan.FinalActive()
+	disabled := plan.FinalDisabled()
 	lines = append(lines,
 		"",
 		helpTextStyle().Bold(true).Render("Activation Preview"),
 		strings.Join([]string{
-			messageStyle(messageSuccess).Render(fmt.Sprintf("Keep %d", len(plan.Keep))),
-			messageStyle(messageSuccess).Render(fmt.Sprintf("Enable %d", len(plan.Enable))),
-			messageStyle(messageError).Render(fmt.Sprintf("Disable %d", len(plan.Disable))),
+			messageStyle(messageSuccess).Render(fmt.Sprintf("Active %d", len(active))),
+			messageStyle(messageError).Render(fmt.Sprintf("Disable %d", len(disabled))),
 		}, "   "),
 	)
 	if plan.HasIssues() {

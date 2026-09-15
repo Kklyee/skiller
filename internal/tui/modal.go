@@ -350,6 +350,59 @@ func (m *Model) viewDeleteGroupModal() string {
 }
 
 func (m *Model) viewReconcileModal() string {
+	if m.planKind == "group" {
+		return m.viewActivationModal()
+	}
+	return m.viewReconcileDiffModal()
+}
+
+func (m *Model) viewActivationModal() string {
+	active := m.plan.FinalActive()
+	disabled := m.plan.FinalDisabled()
+	lines := []string{reconcileSectionStyle(messageSuccess, "Active", len(active))}
+	for _, id := range active {
+		lines = append(lines, messageStyle(messageSuccess).Render("  ● "+id))
+	}
+	lines = append(lines, m.reconcileDivider(), reconcileSectionStyle(messageError, "Disable", len(disabled)))
+	for _, id := range disabled {
+		lines = append(lines, messageStyle(messageError).Render("  ○ "+id))
+	}
+	if len(m.plan.Missing) > 0 {
+		lines = append(lines, m.reconcileDivider(), reconcileSectionStyle(messageInfo, "Missing", len(m.plan.Missing)))
+		for _, id := range m.plan.Missing {
+			lines = append(lines, messageStyle(messageInfo).Render("  ? "+id))
+		}
+	}
+	if len(m.plan.Issues) > 0 {
+		lines = append(lines, m.reconcileDivider(), reconcileSectionStyle(messageError, "Issues", len(m.plan.Issues)))
+		for _, issue := range m.plan.Issues {
+			lines = append(lines, messageStyle(messageError).Render("  ! "+issue))
+		}
+	}
+	lines = append(lines,
+		m.reconcileDivider(),
+		"",
+		helpTextStyle().Bold(true).Render("Final state"),
+		strings.Join([]string{
+			messageStyle(messageSuccess).Render(fmt.Sprintf("%d active", len(active))),
+			messageStyle(messageError).Render(fmt.Sprintf("%d disable", len(disabled))),
+		}, "  "),
+	)
+	if m.plan.HasIssues() {
+		lines = append(lines, "Cannot apply until issues are resolved")
+	}
+	if m.message != "" {
+		lines = append(lines, "", m.renderedMessage())
+	}
+
+	return strings.Join([]string{
+		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Reconcile"),
+		m.panel(m.reconcileTitle(), strings.Join(lines, "\n"), m.width, m.height-3, true),
+		renderKeyHints(keyHint{key: "enter", description: "apply"}, keyHint{key: "esc", description: "cancel"}),
+	}, "\n")
+}
+
+func (m *Model) viewReconcileDiffModal() string {
 	lines := []string{reconcileSectionStyle(messageSuccess, "Enable", len(m.plan.Enable))}
 	for _, id := range m.plan.Enable {
 		lines = append(lines, messageStyle(messageSuccess).Render("  + "+id))

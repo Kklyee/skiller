@@ -28,6 +28,8 @@ func TestBuildPlan(t *testing.T) {
 	assertStrings(t, plan.Keep, "ignored", "wanted")
 	assertStrings(t, plan.KeepActive, "wanted")
 	assertStrings(t, plan.KeepDisabled, "ignored")
+	assertStrings(t, plan.FinalActive(), "needs-enable", "wanted")
+	assertStrings(t, plan.FinalDisabled(), "ignored", "old")
 	assertStrings(t, plan.Missing, "missing")
 	if len(plan.Issues) != 1 || plan.Issues[0] != "keep conflict: conflict" {
 		t.Fatalf("issues: got %v", plan.Issues)
