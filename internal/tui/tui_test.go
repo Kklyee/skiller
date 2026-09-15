@@ -188,6 +188,33 @@ func TestProjectPageShowsConfigAndOpensPreview(t *testing.T) {
 	}
 }
 
+func TestSkillRowsShowProvenanceUpdateBadge(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	provenancePath := filepath.Join(root, "provenance.toml")
+	createSkill(t, activeDir, "research", "Research", "Research skill")
+	if err := skillprovenance.New(provenancePath).Set("research", skillprovenance.Entry{
+		Source: "github", Repository: "owner/repo", Installer: "skills", Revision: "v1",
+	}); err != nil {
+		t.Fatalf("set provenance: %v", err)
+	}
+
+	model, err := NewModel(paths.Set{
+		Active: activeDir, Disabled: filepath.Join(root, "disabled"), Groups: filepath.Join(root, "groups"),
+		Provenance: provenancePath, Journal: filepath.Join(root, "transaction.json"), Lock: filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	view := viewText(&model)
+	if !strings.Contains(view, "↻") {
+		t.Fatalf("provenance badge missing from skill row:\n%s", view)
+	}
+	if !strings.Contains(view, "Update source: skills") {
+		t.Fatalf("update source missing from details:\n%s", view)
+	}
+}
+
 func TestDetailsPanelShowsSkillProvenance(t *testing.T) {
 	root := t.TempDir()
 	activeDir := filepath.Join(root, "active")

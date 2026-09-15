@@ -7,6 +7,7 @@ import (
 	"github.com/Kklyee/skiller/internal/catalog"
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/profile"
+	skillprovenance "github.com/Kklyee/skiller/internal/provenance"
 	"github.com/Kklyee/skiller/internal/reconcile"
 	"strings"
 )
@@ -405,7 +406,11 @@ func (m *Model) viewSkillsPanel() string {
 	}
 	start, end := viewportBounds(len(visible), selected, contentHeight)
 	for _, skill := range visible[start:end] {
-		lines = append(lines, skillRowWithSelection(skill, skill.ID == m.selectedSkill, m.isPinned(skill.ID), m.selectedSkills[skill.ID]))
+		row := skillRowWithSelection(skill, skill.ID == m.selectedSkill, m.isPinned(skill.ID), m.selectedSkills[skill.ID])
+		if origin, ok := m.provenance[skill.ID]; ok && (origin.Repository != "" || origin.Installer != "") {
+			row += " " + updateBadgeStyle().Render("↻")
+		}
+		lines = append(lines, row)
 	}
 	return strings.Join(lines, "\n")
 }
@@ -457,6 +462,9 @@ func (m *Model) viewDetailsPanel() string {
 			"Installer: "+valueOrDash(origin.Installer),
 			"Revision: "+valueOrDash(origin.Revision),
 		)
+		if source := updateSource(origin); source != "" {
+			lines = append(lines, "Update source: "+source)
+		}
 	}
 	pinned := "no"
 	if m.isPinned(skill.ID) {
@@ -464,6 +472,13 @@ func (m *Model) viewDetailsPanel() string {
 	}
 	lines = append(lines, "Pinned: "+pinned)
 	return strings.Join(lines, "\n")
+}
+
+func updateSource(origin skillprovenance.Entry) string {
+	if origin.Installer != "" {
+		return origin.Installer
+	}
+	return origin.Repository
 }
 
 func (m *Model) renderedMessage() string {
