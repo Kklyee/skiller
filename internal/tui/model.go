@@ -12,6 +12,7 @@ import (
 	"github.com/Kklyee/skiller/internal/profile"
 	skillprovenance "github.com/Kklyee/skiller/internal/provenance"
 	"github.com/Kklyee/skiller/internal/reconcile"
+	skillremoval "github.com/Kklyee/skiller/internal/removal"
 	"github.com/Kklyee/skiller/internal/transaction"
 	"github.com/Kklyee/skiller/internal/visibility"
 	"slices"
@@ -80,6 +81,7 @@ type Model struct {
 	input         string
 	deleteGroup   string
 	deleteProfile string
+	deleteSkills  []string
 
 	editorGroup  group.Group
 	editorSkills []string
@@ -720,6 +722,41 @@ func (m *Model) openBatchActions() {
 	m.batchAction = batchActionNone
 	m.batchGroupIndex = 0
 	m.modal = modalBatch
+}
+
+func (m *Model) openDeleteSkills() {
+	ids := m.selectedSkillIDs()
+	if len(ids) == 0 {
+		skill, ok := m.selectedSkillValue()
+		if !ok {
+			m.setMessage(messageInfo, "Select a skill before deleting")
+			return
+		}
+		ids = []string{skill.ID}
+	}
+	m.deleteSkills = ids
+	m.modal = modalDeleteSkills
+	m.clearMessage()
+}
+
+func (m *Model) applyDeleteSkills() {
+	result, err := skillremoval.Delete(m.paths, m.deleteSkills...)
+	if err != nil {
+		m.setError(err)
+		return
+	}
+	m.modal = modalNone
+	m.deleteSkills = nil
+	m.clearSelectedSkills()
+	if err := m.refresh(); err != nil {
+		m.setError(err)
+		return
+	}
+	label := "skills"
+	if len(result.Deleted) == 1 {
+		label = "skill"
+	}
+	m.setMessage(messageSuccess, fmt.Sprintf("Deleted %d %s", len(result.Deleted), label))
 }
 
 func (m *Model) applyBatchVisibility(enable bool) {

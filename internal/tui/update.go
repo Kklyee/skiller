@@ -126,6 +126,10 @@ func (m *Model) updateKey(message bubbletea.KeyPressMsg) bubbletea.Cmd {
 		if m.focus == FocusSkills {
 			m.openBatchActions()
 		}
+	case "delete":
+		if m.focus == FocusSkills {
+			m.openDeleteSkills()
+		}
 	case "c":
 		if m.focus == FocusSkills {
 			m.clearSelectedSkills()

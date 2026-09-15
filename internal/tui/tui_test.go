@@ -298,6 +298,84 @@ func TestSkillsPanelShowsMultiSelectToolbar(t *testing.T) {
 	}
 }
 
+func TestTUIDeletesCurrentSkillAfterConfirmation(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+	createSkill(t, disabledDir, "beta", "Beta", "Second skill")
+
+	model, err := NewModel(paths.Set{
+		Active: activeDir, Disabled: disabledDir, Groups: filepath.Join(root, "groups"),
+		Pins: filepath.Join(root, "pins.toml"), Provenance: filepath.Join(root, "provenance.toml"),
+		Journal: filepath.Join(root, "transaction.json"), Lock: filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(keyCode(bubbletea.KeyTab))
+	model.Update(keyCode(bubbletea.KeyDelete))
+	if model.modal != modalDeleteSkills || !strings.Contains(viewText(&model), "Delete 1 skill permanently?") {
+		t.Fatalf("delete confirmation missing:\n%s", viewText(&model))
+	}
+	model.Update(keyText("n"))
+	if model.modal != modalNone {
+		t.Fatalf("delete modal remained after cancellation: %v", model.modal)
+	}
+	if _, err := os.Stat(filepath.Join(activeDir, "alpha")); err != nil {
+		t.Fatalf("skill removed after cancellation: %v", err)
+	}
+
+	model.Update(keyCode(bubbletea.KeyDelete))
+	model.Update(keyCode(bubbletea.KeyEnter))
+	if model.modal != modalNone {
+		t.Fatalf("delete modal remained after confirmation: %v", model.modal)
+	}
+	if _, err := os.Stat(filepath.Join(activeDir, "alpha")); !os.IsNotExist(err) {
+		t.Fatalf("skill still exists after deletion: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(disabledDir, "beta")); err != nil {
+		t.Fatalf("unselected skill changed after deletion: %v", err)
+	}
+	if !strings.Contains(viewText(&model), "Deleted 1 skill") {
+		t.Fatalf("delete success message missing:\n%s", viewText(&model))
+	}
+}
+
+func TestTUIDeletesMarkedSkillsTogether(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+	createSkill(t, activeDir, "beta", "Beta", "Second skill")
+	createSkill(t, activeDir, "gamma", "Gamma", "Third skill")
+
+	model, err := NewModel(paths.Set{
+		Active: activeDir, Disabled: filepath.Join(root, "disabled"), Groups: filepath.Join(root, "groups"),
+		Journal: filepath.Join(root, "transaction.json"), Lock: filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(keyCode(bubbletea.KeyTab))
+	model.Update(keyText("x"))
+	model.Update(keyCode(bubbletea.KeyDown))
+	model.Update(keyText("x"))
+	model.Update(keyCode(bubbletea.KeyDelete))
+	if model.modal != modalDeleteSkills || !strings.Contains(viewText(&model), "Delete 2 skills permanently?") {
+		t.Fatalf("multi-delete confirmation missing:\n%s", viewText(&model))
+	}
+	model.Update(keyCode(bubbletea.KeyEnter))
+
+	for _, id := range []string{"alpha", "beta"} {
+		if _, err := os.Stat(filepath.Join(activeDir, id)); !os.IsNotExist(err) {
+			t.Fatalf("marked skill %s still exists: %v", id, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(activeDir, "gamma")); err != nil {
+		t.Fatalf("unmarked skill changed after deletion: %v", err)
+	}
+}
+
 func TestCommandPaletteFiltersAndExecutesNavigation(t *testing.T) {
 	root := t.TempDir()
 	model, err := NewModel(paths.Set{

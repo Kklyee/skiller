@@ -69,6 +69,15 @@ func TestRootCommandOmitsRemovedWorkflows(t *testing.T) {
 	}
 }
 
+func TestRootCommandRegistersDelete(t *testing.T) {
+	for _, command := range NewRootCommand().Commands() {
+		if command.Name() == "delete" {
+			return
+		}
+	}
+	t.Fatal("delete command is not registered")
+}
+
 func TestHelpPaletteUsesSemanticColors(t *testing.T) {
 	palette := newHelpPalette(&bytes.Buffer{})
 	want := map[string]color.Color{

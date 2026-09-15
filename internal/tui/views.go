@@ -42,6 +42,9 @@ func (m *Model) viewContent() string {
 	if m.modal == modalDeleteProfile {
 		return m.viewDeleteProfileModal()
 	}
+	if m.modal == modalDeleteSkills {
+		return m.viewDeleteSkillsModal()
+	}
 	if m.modal == modalBatch {
 		return m.viewBatchModal()
 	}
@@ -445,7 +448,10 @@ func (m *Model) viewSelectionToolbar() string {
 		return ""
 	}
 	return selectionStyle().Render(fmt.Sprintf("✓ %d selected", m.selectedSkillCount())) + "  " +
-		renderKeyHints(keyHint{key: "b", description: "batch"})
+		renderKeyHints(
+			keyHint{key: "b", description: "batch"},
+			keyHint{key: "delete", description: "remove"},
+		)
 }
 
 func (m *Model) viewSearchBar(matches int) string {
@@ -563,6 +569,7 @@ func (m *Model) viewFooter() string {
 			keyHint{key: "space", description: "toggle"},
 			keyHint{key: "x", description: "mark"},
 			keyHint{key: "b", description: "batch"},
+			keyHint{key: "delete", description: "remove"},
 		)
 	}
 	hints = append(hints,
@@ -876,6 +883,7 @@ func (m *Model) viewHelp() string {
 		helpLine("a", "toggle all visible skills"),
 		helpLine("x", "mark or unmark a skill"),
 		helpLine("b", "batch actions for marked skills"),
+		helpLine("delete", "permanently remove current or marked skills"),
 		helpLine("c", "clear marked skills"),
 		helpLine("/", "search by ID, metadata, or group"),
 		helpLine("g", "group management"),

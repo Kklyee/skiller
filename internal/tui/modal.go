@@ -20,6 +20,7 @@ const (
 	modalDeleteGroup
 	modalGroupName
 	modalDeleteProfile
+	modalDeleteSkills
 	modalProfileName
 	modalBatch
 	modalBatchGroup
@@ -193,6 +194,19 @@ func (m *Model) updateModal(message bubbletea.KeyPressMsg) bubbletea.Cmd {
 		return nil
 	}
 
+	if m.modal == modalDeleteSkills {
+		if key == "esc" || key == "n" {
+			m.modal = modalNone
+			m.deleteSkills = nil
+			m.clearMessage()
+			return nil
+		}
+		if key == "enter" || strings.EqualFold(key, "y") {
+			m.applyDeleteSkills()
+		}
+		return nil
+	}
+
 	if key == "esc" || key == "n" {
 		m.modal = modalNone
 		m.clearMessage()
@@ -259,6 +273,7 @@ func (m *Model) paletteCommands() []paletteCommand {
 		{id: "help", title: "Help", description: "show keyboard help"},
 		{id: "search", title: "Search skills", description: "filter the skill list"},
 		{id: "toggle-all", title: "Toggle all visible skills", description: "activate or disable visible skills"},
+		{id: "delete", title: "Delete selected skills", description: "permanently remove current or marked skills"},
 	}
 }
 
@@ -319,6 +334,8 @@ func (m *Model) executePaletteCommand() {
 		m.search = ""
 	case "toggle-all":
 		m.toggleAllSkills()
+	case "delete":
+		m.openDeleteSkills()
 	}
 }
 
@@ -423,6 +440,37 @@ func (m *Model) viewDeleteProfileModal() string {
 	return strings.Join([]string{
 		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Profiles"),
 		m.panel("Confirm Delete", strings.Join(lines, "\n"), m.width, m.height-3, true),
+		renderKeyHints(
+			keyHint{key: "enter/y", description: "delete"},
+			keyHint{key: "esc/n", description: "cancel"},
+		),
+	}, "\n")
+}
+
+func (m *Model) viewDeleteSkillsModal() string {
+	count := len(m.deleteSkills)
+	label := "skills"
+	if count == 1 {
+		label = "skill"
+	}
+	lines := []string{
+		messageStyle(messageError).Render(fmt.Sprintf("Delete %d %s permanently?", count, label)),
+		"",
+		messageStyle(messageError).Render("The installed skill directory will be removed."),
+	}
+	for _, id := range m.deleteSkills {
+		lines = append(lines, messageStyle(messageError).Render("  • "+id))
+	}
+	lines = append(lines, "", helpTextStyle().Render("Pins and Group/Profile references will also be cleaned."))
+	for _, id := range m.deleteSkills {
+		if m.isPinned(id) {
+			lines = append(lines, helpTextStyle().Render("Pinned skills will be unpinned automatically."))
+			break
+		}
+	}
+	return strings.Join([]string{
+		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Skills"),
+		m.panel("Confirm Permanent Delete", strings.Join(lines, "\n"), m.width, m.height-3, true),
 		renderKeyHints(
 			keyHint{key: "enter/y", description: "delete"},
 			keyHint{key: "esc/n", description: "cancel"},

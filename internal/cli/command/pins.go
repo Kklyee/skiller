@@ -139,6 +139,10 @@ func selectPinnedSkills(cmd *cobra.Command, pinned []string, installed []catalog
 }
 
 func selectSkillOptions(cmd *cobra.Command, title string, options []skillOption) ([]string, bool, error) {
+	return selectSkillOptionsWithReader(cmd, title, options, bufio.NewReader(cmd.InOrStdin()))
+}
+
+func selectSkillOptionsWithReader(cmd *cobra.Command, title string, options []skillOption, reader *bufio.Reader) ([]string, bool, error) {
 	out := cmd.OutOrStdout()
 	if _, err := fmt.Fprintln(out, title); err != nil {
 		return nil, false, fmt.Errorf("write skill picker: %w", err)
@@ -155,7 +159,7 @@ func selectSkillOptions(cmd *cobra.Command, title string, options []skillOption)
 		return nil, false, fmt.Errorf("write skill picker prompt: %w", err)
 	}
 
-	selection, err := bufio.NewReader(cmd.InOrStdin()).ReadString('\n')
+	selection, err := reader.ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, false, fmt.Errorf("read skill selection: %w", err)
 	}

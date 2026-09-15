@@ -16,6 +16,7 @@ Skiller 把环境选择保存为可重复的配置，让切换和恢复更简单
 - 查看并切换 `active`、`disabled`、`conflict`、`broken`、`invalid` 状态；
 - 使用 Group、Profile 组织 Skill 环境；
 - 用 pin 保证关键 Skill 始终保持 active；
+- 永久删除本机不再需要的 Skill 目录，并自动清理相关引用；
 - 查看 Skill 来源、安装器、版本和实际位置；
 - 通过 `npx skills` 桥接安装、更新和移除；
 - 用 `doctor` 检查问题。
@@ -53,6 +54,17 @@ skiller enable <skill>
 skiller disable <skill>
 skiller info <skill>
 ```
+
+永久删除 Skill：
+
+```bash
+skiller delete
+```
+
+`delete` 会先列出当前电脑上真实存在的全部 Skill，并显示 `active`、`disabled` 和 `pinned`
+状态。输入编号即可单选或用逗号多选，例如 `1,3,5`；确认后会删除对应的 Skill 目录，并同步
+清理 pin、Group、Profile 和来源记录。这是不可逆操作；也可以用 `--yes` 跳过确认，例如
+`skiller delete --yes code-review`，命令仍会先打印本机安装清单并校验 Skill 是否存在。
 
 管理分组：
 
@@ -99,6 +111,7 @@ Space       切换当前 Skill
 a           激活/禁用全部可见 Skill
 x           标记 Skill
 b           批量操作
+Delete      永久删除当前或已标记的 Skill
 /           搜索
 g           Groups
 u           预览并应用当前 Group/Profile
