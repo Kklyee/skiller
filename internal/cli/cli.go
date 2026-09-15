@@ -23,9 +23,12 @@ func NewRootCommand() *cobra.Command {
 		Version:       version.Version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		CompletionOptions: cobra.CompletionOptions{
+			DisableDefaultCmd: true,
+		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			switch cmd.Name() {
-			case "doctor", "completion", "version":
+			case "doctor":
 				return nil
 			}
 
@@ -61,8 +64,6 @@ func NewRootCommand() *cobra.Command {
 		command.NewPin(),
 		command.NewUnpin(),
 		command.NewPins(),
-		command.NewVersion(),
-		command.NewCompletion(),
 		command.NewTUI(),
 	)
 

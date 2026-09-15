@@ -52,10 +52,12 @@ func TestRootVersionFlag(t *testing.T) {
 func TestRootCommandOmitsRemovedWorkflows(t *testing.T) {
 	root := NewRootCommand()
 	removed := map[string]bool{
-		"export": false,
-		"import": false,
-		"sync":   false,
-		"run":    false,
+		"completion": false,
+		"export":     false,
+		"import":     false,
+		"sync":       false,
+		"run":        false,
+		"version":    false,
 	}
 	for _, command := range root.Commands() {
 		if _, ok := removed[command.Name()]; ok {
