@@ -7,6 +7,7 @@ import (
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/paths"
 	"github.com/Kklyee/skiller/internal/pin"
+	"github.com/Kklyee/skiller/internal/profile"
 	skillprovenance "github.com/Kklyee/skiller/internal/provenance"
 	"github.com/Kklyee/skiller/internal/reconcile"
 	"github.com/Kklyee/skiller/internal/transaction"
@@ -24,6 +25,7 @@ const (
 	ScreenGroupDetails
 	ScreenDoctor
 	ScreenHelp
+	ScreenProfiles
 )
 
 type Focus uint8
@@ -46,6 +48,7 @@ type Model struct {
 
 	skills     []catalog.Skill
 	groups     []group.Group
+	profiles   []profile.Profile
 	pins       []string
 	provenance map[string]skillprovenance.Entry
 	summary    catalog.Summary
@@ -53,17 +56,19 @@ type Model struct {
 	screen Screen
 	focus  Focus
 
-	selectedGroup  string
-	selectedSkill  string
-	selectedSkills map[string]bool
-	activeGroup    string
-	detailExpanded bool
+	selectedGroup   string
+	selectedProfile string
+	selectedSkill   string
+	selectedSkills  map[string]bool
+	activeGroup     string
+	detailExpanded  bool
 
 	search       string
 	searchActive bool
 
 	modal       modal
 	plan        reconcile.Plan
+	planKind    string
 	input       string
 	deleteGroup string
 
@@ -105,6 +110,7 @@ func NewModel(pathSet paths.Set) (Model, error) {
 
 func (m *Model) refresh() error {
 	previousGroup := m.selectedGroup
+	previousProfile := m.selectedProfile
 	previousSkill := m.selectedSkill
 
 	skills, err := catalog.Scan(m.paths.Active, m.paths.Disabled)
@@ -112,6 +118,10 @@ func (m *Model) refresh() error {
 		return err
 	}
 	groups, err := group.New(m.paths.Groups).ListWithMissing(skills)
+	if err != nil {
+		return err
+	}
+	profiles, err := profile.New(m.paths.Profiles).List()
 	if err != nil {
 		return err
 	}
@@ -126,6 +136,7 @@ func (m *Model) refresh() error {
 
 	m.skills = skills
 	m.groups = groups
+	m.profiles = profiles
 	m.pins = pinned
 	m.provenance = provenanceData
 	m.activeGroup = findActiveGroup(groups, skills)
@@ -133,9 +144,11 @@ func (m *Model) refresh() error {
 	m.summary.ActiveDir = m.paths.Active
 	m.summary.DisabledDir = m.paths.Disabled
 	m.selectedGroup = previousGroup
+	m.selectedProfile = previousProfile
 	m.selectedSkill = previousSkill
 	m.normalizeSkillSelection()
 	m.normalizeGroupSelection()
+	m.normalizeProfileSelection()
 	m.normalizeSelection()
 
 	return nil
@@ -250,6 +263,50 @@ func (m *Model) normalizeGroupSelection() {
 	if m.screen == ScreenGroups {
 		m.selectedGroup = m.groups[0].Name
 	}
+}
+
+func (m *Model) normalizeProfileSelection() {
+	for _, stored := range m.profiles {
+		if stored.Name == m.selectedProfile {
+			return
+		}
+	}
+	if len(m.profiles) == 0 {
+		m.selectedProfile = ""
+		return
+	}
+	m.selectedProfile = m.profiles[0].Name
+}
+
+func (m *Model) moveProfile(delta int) {
+	if len(m.profiles) == 0 {
+		m.selectedProfile = ""
+		return
+	}
+	index := 0
+	for i, stored := range m.profiles {
+		if stored.Name == m.selectedProfile {
+			index = i
+			break
+		}
+	}
+	index += delta
+	if index < 0 {
+		index = 0
+	}
+	if index >= len(m.profiles) {
+		index = len(m.profiles) - 1
+	}
+	m.selectedProfile = m.profiles[index].Name
+}
+
+func (m *Model) selectedProfileValue() (profile.Profile, bool) {
+	for _, stored := range m.profiles {
+		if stored.Name == m.selectedProfile {
+			return stored, true
+		}
+	}
+	return profile.Profile{}, false
 }
 
 func (m *Model) visibleSkills() []catalog.Skill {
@@ -548,6 +605,7 @@ func (m *Model) toggleAllSkills() {
 }
 
 func (m *Model) openReconcile() {
+	m.planKind = "group"
 	if m.selectedGroup == "" {
 		selected := group.Group{Name: allGroupName, Skills: make([]string, 0, len(m.skills))}
 		for _, skill := range m.skills {
@@ -564,6 +622,22 @@ func (m *Model) openReconcile() {
 			return
 		}
 	}
+}
+
+func (m *Model) openProfileReconcile() {
+	stored, ok := m.selectedProfileValue()
+	if !ok {
+		m.setMessage(messageInfo, "Select a profile before using it")
+		return
+	}
+	target := profile.Resolve(stored, m.groups)
+	m.plan = reconcile.BuildWithPins(target.Group, m.skills, m.pins)
+	for _, name := range target.MissingGroups {
+		m.plan.Issues = append(m.plan.Issues, fmt.Sprintf("missing group %s", name))
+	}
+	slices.Sort(m.plan.Issues)
+	m.planKind = "profile"
+	m.modal = modalReconcile
 }
 
 func (m *Model) openEditor() {

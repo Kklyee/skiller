@@ -16,6 +16,7 @@ import (
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/paths"
 	"github.com/Kklyee/skiller/internal/pin"
+	"github.com/Kklyee/skiller/internal/profile"
 	skillprovenance "github.com/Kklyee/skiller/internal/provenance"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -104,6 +105,52 @@ func TestMainViewAndKeyboardInteractions(t *testing.T) {
 	model.Update(keyText("g"))
 	if !strings.Contains(viewText(&model), "Skiller / Groups") {
 		t.Fatalf("groups screen missing:\n%s", viewText(&model))
+	}
+}
+
+func TestProfilesPageShowsProfileAndOpensPreview(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	groupsDir := filepath.Join(root, "groups")
+	profilesDir := filepath.Join(root, "profiles")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+	groupStore := group.New(groupsDir)
+	if _, err := groupStore.Create("coding"); err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	if _, err := groupStore.Add("coding", "alpha"); err != nil {
+		t.Fatalf("add group skill: %v", err)
+	}
+	profileStore := profile.New(profilesDir)
+	if _, err := profileStore.Create("go-backend"); err != nil {
+		t.Fatalf("create profile: %v", err)
+	}
+	if err := profileStore.Update("go-backend", profile.Profile{
+		Name: "go-backend", Groups: []string{"coding"}, Exclude: []string{}, Skills: []string{},
+	}); err != nil {
+		t.Fatalf("update profile: %v", err)
+	}
+
+	model, err := NewModel(paths.Set{
+		Active: activeDir, Disabled: filepath.Join(root, "disabled"), Groups: groupsDir,
+		Profiles: profilesDir, Journal: filepath.Join(root, "transaction.json"), Lock: filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(keyText("p"))
+	view := viewText(&model)
+	for _, want := range []string{"Skiller / Profiles", "go-backend", "coding", "Groups"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("profiles page missing %q:\n%s", want, view)
+		}
+	}
+	model.Update(keyText("u"))
+	if model.modal != modalReconcile || model.plan.Group != "go-backend" {
+		t.Fatalf("profile use did not open preview: modal=%v plan=%+v", model.modal, model.plan)
+	}
+	if !strings.Contains(viewText(&model), "Activate Profile: go-backend") {
+		t.Fatalf("profile preview title missing:\n%s", viewText(&model))
 	}
 }
 

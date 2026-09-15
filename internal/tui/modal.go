@@ -80,7 +80,7 @@ func (m *Model) updateModal(message bubbletea.KeyPressMsg) bubbletea.Cmd {
 				m.setError(err)
 				return nil
 			} else {
-				m.setMessage(messageSuccess, fmt.Sprintf("Applied group %s", m.plan.Group))
+				m.setMessage(messageSuccess, fmt.Sprintf("Applied %s %s", m.planKind, m.plan.Group))
 			}
 			m.modal = modalNone
 		}
@@ -269,7 +269,15 @@ func (m *Model) viewReconcileModal() string {
 
 	return strings.Join([]string{
 		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Reconcile"),
-		m.panel("Activate Group: "+m.plan.Group, strings.Join(lines, "\n"), m.width, m.height-3, true),
+		m.panel(m.reconcileTitle(), strings.Join(lines, "\n"), m.width, m.height-3, true),
 		renderKeyHints(keyHint{key: "enter", description: "apply"}, keyHint{key: "esc", description: "cancel"}),
 	}, "\n")
+}
+
+func (m *Model) reconcileTitle() string {
+	label := "Group"
+	if m.planKind == "profile" {
+		label = "Profile"
+	}
+	return "Activate " + label + ": " + m.plan.Group
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/Kklyee/skiller/internal/catalog"
 	"github.com/Kklyee/skiller/internal/group"
+	"github.com/Kklyee/skiller/internal/profile"
 	"github.com/Kklyee/skiller/internal/reconcile"
 	"strings"
 )
@@ -50,6 +51,8 @@ func (m *Model) viewContent() string {
 		return m.viewDoctor()
 	case ScreenHelp:
 		return m.viewHelp()
+	case ScreenProfiles:
+		return m.viewProfiles()
 	default:
 		return m.viewMain()
 	}
@@ -99,6 +102,118 @@ func (m *Model) viewMain() string {
 		}, bodyHeight),
 		m.viewFooter(),
 	}, "\n")
+}
+
+func (m *Model) viewProfiles() string {
+	leftWidth := m.width / 3
+	if leftWidth < 30 {
+		leftWidth = 30
+	}
+	if leftWidth > 42 {
+		leftWidth = 42
+	}
+	if leftWidth > m.width-24 {
+		leftWidth = m.width - 24
+	}
+	if leftWidth < 4 {
+		leftWidth = 4
+	}
+	rightWidth := m.width - leftWidth
+	panelHeight := m.height - 3
+	if panelHeight < 3 {
+		panelHeight = 3
+	}
+	footer := renderKeyHints(
+		keyHint{key: "↑↓/jk", description: "move"},
+		keyHint{key: "u/enter", description: "use"},
+		keyHint{key: "esc", description: "back"},
+	)
+	return strings.Join([]string{
+		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Profiles"),
+		lipgloss.JoinHorizontal(
+			lipgloss.Top,
+			m.panel("Profiles", m.viewProfileList(), leftWidth, panelHeight, true),
+			m.panel(m.profileDetailsTitle(), m.viewProfileDetails(), rightWidth, panelHeight, false),
+		),
+		footer,
+	}, "\n")
+}
+
+func (m *Model) viewProfileList() string {
+	if len(m.profiles) == 0 {
+		return helpTextStyle().Render("No profiles")
+	}
+	lines := make([]string, 0, len(m.profiles))
+	for _, stored := range m.profiles {
+		prefix := "  "
+		if stored.Name == m.selectedProfile {
+			prefix = selectedRowStyle().Render("›") + " "
+		}
+		marker := stateStyle(catalog.StateDisabled).Render("○")
+		if m.profileApplied(stored) {
+			marker = stateStyle(catalog.StateActive).Render("●")
+		}
+		name := groupNameStyle().Render(stored.Name)
+		if stored.Name == m.selectedProfile {
+			name = groupNameStyle().Bold(true).Render(stored.Name)
+		}
+		lines = append(lines, fmt.Sprintf("%s%s %s  %s", prefix, marker, name, helpTextStyle().Render(profileSummary(stored))))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (m *Model) profileDetailsTitle() string {
+	if stored, ok := m.selectedProfileValue(); ok {
+		return stored.Name
+	}
+	return "Details"
+}
+
+func (m *Model) viewProfileDetails() string {
+	stored, ok := m.selectedProfileValue()
+	if !ok {
+		return helpTextStyle().Render("Select a profile to inspect its environment")
+	}
+	target := profile.Resolve(stored, m.groups)
+	status := stateStyle(catalog.StateDisabled).Render("○ Not applied")
+	if m.profileApplied(stored) {
+		status = stateStyle(catalog.StateActive).Render("● Applied")
+	}
+	lines := []string{
+		"Name: " + groupNameStyle().Render(stored.Name),
+		"Status: " + status,
+		"Groups: " + listOrDash(stored.Groups),
+		"Skills: " + listOrDash(stored.Skills),
+		"Exclude: " + listOrDash(stored.Exclude),
+		"Resolved: " + fmt.Sprintf("%d skills", len(target.Group.Skills)),
+	}
+	if len(target.MissingGroups) > 0 {
+		lines = append(lines, messageStyle(messageError).Render("Missing groups: "+strings.Join(target.MissingGroups, ", ")))
+	}
+	if missing := profile.MissingSkills(target, m.skills); len(missing) > 0 {
+		lines = append(lines, messageStyle(messageError).Render("Missing skills: "+strings.Join(missing, ", ")))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (m *Model) profileApplied(stored profile.Profile) bool {
+	target := profile.Resolve(stored, m.groups)
+	if len(target.MissingGroups) > 0 || len(profile.MissingSkills(target, m.skills)) > 0 {
+		return false
+	}
+	plan := reconcile.BuildWithPins(target.Group, m.skills, m.pins)
+	return !plan.HasIssues() && plan.Changes() == 0
+}
+
+func profileSummary(stored profile.Profile) string {
+	return fmt.Sprintf("%d groups  %d skills  %d excluded", len(stored.Groups), len(stored.Skills), len(stored.Exclude))
+}
+
+func listOrDash(values []string) string {
+	if len(values) == 0 {
+		return "-"
+	}
+	return strings.Join(values, ", ")
 }
 
 func (m *Model) viewHeader() string {
@@ -279,6 +394,7 @@ func (m *Model) viewFooter() string {
 	hints = append(hints,
 		keyHint{key: "/", description: "search"},
 		keyHint{key: "g", description: "groups"},
+		keyHint{key: "p", description: "profiles"},
 		keyHint{key: "u", description: "use"},
 	)
 	if m.focus == FocusGroups {
@@ -528,6 +644,7 @@ func (m *Model) viewHelp() string {
 		helpLine("c", "clear marked skills"),
 		helpLine("/", "search by ID, metadata, or group"),
 		helpLine("g", "group management"),
+		helpLine("p", "profile environments"),
 		helpLine("u", "preview and apply selected group"),
 		helpLine("enter", "expand details"),
 		helpLine("d", "doctor/status"),
