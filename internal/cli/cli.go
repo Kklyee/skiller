@@ -50,6 +50,8 @@ func NewRootCommand() *cobra.Command {
 		command.NewInstall(),
 		command.NewUpdate(),
 		command.NewRemove(),
+		command.NewExport(),
+		command.NewImport(),
 		command.NewDisable(),
 		command.NewEnable(),
 		command.NewStatus(),

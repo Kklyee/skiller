@@ -111,6 +111,31 @@ func (s Store) Create(name string) (Profile, error) {
 	return stored, nil
 }
 
+func (s Store) Save(stored Profile, replace bool) error {
+	if err := validateName(stored.Name); err != nil {
+		return err
+	}
+	if err := validateLists(stored); err != nil {
+		return fmt.Errorf("validate profile %q: %w", stored.Name, err)
+	}
+	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
+		return fmt.Errorf("create profiles directory %q: %w", s.Dir, err)
+	}
+
+	path := s.path(stored.Name)
+	if !replace {
+		if _, err := os.Lstat(path); err == nil {
+			return fmt.Errorf("profile %q already exists", stored.Name)
+		} else if !errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("inspect profile %q: %w", stored.Name, err)
+		}
+	}
+	if err := writeProfile(path, stored, !replace); err != nil {
+		return fmt.Errorf("save profile %q: %w", stored.Name, err)
+	}
+	return nil
+}
+
 func (s Store) Update(name string, updated Profile) error {
 	if err := validateName(name); err != nil {
 		return err

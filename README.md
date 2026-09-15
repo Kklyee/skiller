@@ -115,6 +115,16 @@ skiller remove code-review
 命令默认调用 `npx skills`，也可以通过 `SKILLER_SKILLS_COMMAND` 指定可执行文件。
 Skiller 不接管 Skill 内容；安装器产生冲突时会保留两份副本并提示处理。
 
+## 导出与导入
+
+```bash
+skiller export skiller-environment.toml
+skiller import skiller-environment.toml --install-missing
+```
+
+Bundle 保存 active 快照、pins、groups、profiles 和 Skill 来源。导入会先检查
+缺失 Skill；`--install-missing` 会根据来源尝试安装，`--replace` 用于覆盖同名配置。
+
 ## 项目同步
 
 在项目目录创建 `.skiller.toml`，选择一个 Profile 或直接列出 Skill：
@@ -209,6 +219,8 @@ skiller info <skill>
 skiller install <source> [skills CLI args...]
 skiller update [skills CLI args...]
 skiller remove <skills CLI args...>
+skiller export <file>
+skiller import <file> [--install-missing] [--replace]
 skiller pin <skills...>
 skiller unpin <skills...>
 skiller pins

@@ -120,6 +120,31 @@ func (s Store) Create(name string) (Group, error) {
 	return group, nil
 }
 
+func (s Store) Save(stored Group, replace bool) error {
+	if err := validateName(stored.Name); err != nil {
+		return err
+	}
+	if err := validateSkills(stored.Skills); err != nil {
+		return fmt.Errorf("validate group %q: %w", stored.Name, err)
+	}
+	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
+		return fmt.Errorf("create groups directory %q: %w", s.Dir, err)
+	}
+
+	path := s.path(stored.Name)
+	if !replace {
+		if _, err := os.Lstat(path); err == nil {
+			return fmt.Errorf("group %q already exists", stored.Name)
+		} else if !errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("inspect group %q: %w", stored.Name, err)
+		}
+	}
+	if err := writeGroup(path, stored, !replace); err != nil {
+		return fmt.Errorf("save group %q: %w", stored.Name, err)
+	}
+	return nil
+}
+
 func (s Store) Delete(name string) error {
 	if err := validateName(name); err != nil {
 		return err

@@ -119,6 +119,21 @@ func (s Store) Remove(skills ...string) (int, error) {
 	return removed, nil
 }
 
+func (s Store) Replace(skills []string) error {
+	if s.Path == "" {
+		return errors.New("pins file path is empty")
+	}
+	if err := validateStored(skills); err != nil {
+		return err
+	}
+	updated := slices.Clone(skills)
+	slices.Sort(updated)
+	if err := s.write(file{Skills: updated}); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s Store) write(stored file) error {
 	var data bytes.Buffer
 	if err := toml.NewEncoder(&data).Encode(stored); err != nil {
