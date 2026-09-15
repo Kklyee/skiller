@@ -9,13 +9,13 @@ func recordEnvironmentTarget(pathSet paths.Set, target environment.Target) error
 	return environment.New(pathSet.StatePath()).Save(target)
 }
 
-func clearEnvironmentTarget(pathSet paths.Set, kind environment.Kind, name, path string) error {
+func clearEnvironmentTarget(pathSet paths.Set, kind environment.Kind, name string) error {
 	store := environment.New(pathSet.StatePath())
 	current, ok, err := store.Load()
 	if err != nil || !ok {
 		return err
 	}
-	if current.Kind != kind || current.Name != name || (kind == environment.KindProject && current.Path != path) {
+	if current.Kind != kind || current.Name != name {
 		return nil
 	}
 	return store.Clear()

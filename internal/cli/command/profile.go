@@ -204,7 +204,7 @@ func newProfileDelete() *cobra.Command {
 			if err := profile.New(pathSet.Profiles).Delete(args[0]); err != nil {
 				return err
 			}
-			if err := clearEnvironmentTarget(pathSet, environment.KindProfile, args[0], ""); err != nil {
+			if err := clearEnvironmentTarget(pathSet, environment.KindProfile, args[0]); err != nil {
 				return err
 			}
 			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Deleted profile %s\n", args[0])

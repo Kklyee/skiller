@@ -105,7 +105,7 @@ func newGroupDelete() *cobra.Command {
 			if err := store.Delete(args[0]); err != nil {
 				return err
 			}
-			if err := clearEnvironmentTarget(pathSet, environment.KindGroup, args[0], ""); err != nil {
+			if err := clearEnvironmentTarget(pathSet, environment.KindGroup, args[0]); err != nil {
 				return err
 			}
 			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Deleted group %s\n", args[0])

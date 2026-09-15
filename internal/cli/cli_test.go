@@ -49,6 +49,26 @@ func TestRootVersionFlag(t *testing.T) {
 	}
 }
 
+func TestRootCommandOmitsRemovedWorkflows(t *testing.T) {
+	root := NewRootCommand()
+	removed := map[string]bool{
+		"export": false,
+		"import": false,
+		"sync":   false,
+		"run":    false,
+	}
+	for _, command := range root.Commands() {
+		if _, ok := removed[command.Name()]; ok {
+			removed[command.Name()] = true
+		}
+	}
+	for name, found := range removed {
+		if found {
+			t.Fatalf("removed command %q is still registered", name)
+		}
+	}
+}
+
 func TestHelpPaletteUsesSemanticColors(t *testing.T) {
 	palette := newHelpPalette(&bytes.Buffer{})
 	want := map[string]color.Color{

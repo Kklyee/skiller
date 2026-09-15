@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 
 	"github.com/Kklyee/skiller/internal/catalog"
@@ -65,7 +66,7 @@ func newInstallerCommand(name, installerAction string, minimumArgs int, run inst
 			installerErr := run(cmd.Context(), installerArgs, cmd.InOrStdin(), cmd.OutOrStdout(), cmd.ErrOrStderr())
 			var restoreErr error
 			if installerAction == "update" && len(temporarilyEnabled) > 0 {
-				restoreErr = restoreSkillEnvironment(pathSet, originalActive)
+				restoreErr = restoreInstallerSkillEnvironment(pathSet, originalActive)
 				if restoreErr == nil {
 					if _, err := fmt.Fprintln(cmd.OutOrStdout(), "Restored disabled skill state"); err != nil {
 						restoreErr = err
@@ -115,6 +116,37 @@ func installerLabel() string {
 		executable = "npx"
 	}
 	return executable + " skills"
+}
+
+func activeSkillIDs(skills []catalog.Skill) []string {
+	active := make([]string, 0, len(skills))
+	for _, skill := range skills {
+		if skill.State == catalog.StateActive {
+			active = append(active, skill.ID)
+		}
+	}
+	slices.Sort(active)
+	return active
+}
+
+func restoreInstallerSkillEnvironment(pathSet paths.Set, originalActive []string) error {
+	skills, err := catalog.Scan(pathSet.Active, pathSet.Disabled)
+	if err != nil {
+		return fmt.Errorf("inspect skills for restore: %w", err)
+	}
+	pinned, err := loadPins(pathSet)
+	if err != nil {
+		return err
+	}
+
+	plan := reconcile.BuildWithPins(group.Group{Name: "installer-restore", Skills: originalActive}, skills, pinned)
+	if plan.HasIssues() {
+		return errors.New("cannot restore original skill environment with missing skills or catalog issues")
+	}
+	if err := transaction.Apply(pathSet, plan); err != nil {
+		return fmt.Errorf("restore original skill environment: %w", err)
+	}
+	return nil
 }
 
 func prepareInstallerUpdate(pathSet paths.Set, skills []catalog.Skill, pinned, args []string) ([]string, error) {

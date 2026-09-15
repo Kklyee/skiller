@@ -10,7 +10,6 @@ import (
 	"github.com/Kklyee/skiller/internal/paths"
 	"github.com/Kklyee/skiller/internal/pin"
 	"github.com/Kklyee/skiller/internal/profile"
-	"github.com/Kklyee/skiller/internal/project"
 	skillprovenance "github.com/Kklyee/skiller/internal/provenance"
 	"github.com/Kklyee/skiller/internal/reconcile"
 	"github.com/Kklyee/skiller/internal/transaction"
@@ -30,7 +29,6 @@ const (
 	ScreenHelp
 	ScreenProfiles
 	ScreenProfileEditor
-	ScreenProject
 )
 
 type Focus uint8
@@ -57,11 +55,6 @@ type Model struct {
 	pins       []string
 	provenance map[string]skillprovenance.Entry
 	summary    catalog.Summary
-
-	projectConfig project.Config
-	projectPath   string
-	projectLoaded bool
-	projectError  string
 
 	screen Screen
 	focus  Focus
@@ -220,21 +213,6 @@ func (m *Model) planForTarget(target environment.Target) (reconcile.Plan, error)
 		}
 		slices.Sort(plan.Issues)
 		return plan, nil
-	case environment.KindProject:
-		config, err := project.LoadFile(target.Path)
-		if err != nil {
-			return reconcile.Plan{}, err
-		}
-		resolved, missingGroups, err := m.projectTargetForConfig(config)
-		if err != nil {
-			return reconcile.Plan{}, err
-		}
-		plan := reconcile.BuildWithPins(resolved, m.skills, m.pins)
-		for _, name := range missingGroups {
-			plan.Issues = append(plan.Issues, fmt.Sprintf("missing group %s", name))
-		}
-		slices.Sort(plan.Issues)
-		return plan, nil
 	default:
 		return reconcile.Plan{}, fmt.Errorf("unsupported environment target kind %q", target.Kind)
 	}
@@ -256,15 +234,15 @@ func (m *Model) groupTarget(name string) (group.Group, bool) {
 	return group.Group{}, false
 }
 
-func (m *Model) targetMatches(kind environment.Kind, name, path string) bool {
+func (m *Model) targetMatches(kind environment.Kind, name string) bool {
 	if !m.targetLoaded || m.appliedTarget.Kind != kind || m.appliedTarget.Name != name {
 		return false
 	}
-	return kind != environment.KindProject || m.appliedTarget.Path == path
+	return true
 }
 
-func (m *Model) statusForTarget(kind environment.Kind, name, path string) environment.Status {
-	if !m.targetMatches(kind, name, path) {
+func (m *Model) statusForTarget(kind environment.Kind, name string) environment.Status {
+	if !m.targetMatches(kind, name) {
 		return environment.StatusManual
 	}
 	return m.targetStatus
@@ -980,47 +958,6 @@ func (m *Model) openProfileReconcile() {
 	m.modal = modalReconcile
 }
 
-func (m *Model) openProject() {
-	m.projectConfig = project.Config{}
-	m.projectPath = ""
-	m.projectLoaded = false
-	m.projectError = ""
-	config, path, err := project.Load(".")
-	if err != nil {
-		m.projectError = err.Error()
-	} else {
-		m.projectConfig = config
-		m.projectPath = path
-		m.projectLoaded = true
-	}
-	m.screen = ScreenProject
-	m.clearMessage()
-}
-
-func (m *Model) projectTarget() (group.Group, []string, error) {
-	if !m.projectLoaded {
-		return group.Group{}, nil, fmt.Errorf("project config is not loaded")
-	}
-	return m.projectTargetForConfig(m.projectConfig)
-}
-
-func (m *Model) projectTargetForConfig(config project.Config) (group.Group, []string, error) {
-	base := group.Group{Name: "project", Skills: config.Skills}
-	missingGroups := []string(nil)
-	if config.Profile != "" {
-		stored, ok := m.profileByName(config.Profile)
-		if !ok {
-			return group.Group{}, nil, fmt.Errorf("profile %q does not exist", config.Profile)
-		}
-		target := profile.Resolve(stored, m.groups)
-		base = target.Group
-		missingGroups = target.MissingGroups
-	}
-	base = project.ApplyOverrides(base, config.Include, config.Exclude)
-	base.Name = "project"
-	return base, missingGroups, nil
-}
-
 func (m *Model) profileByName(name string) (profile.Profile, bool) {
 	for _, stored := range m.profiles {
 		if stored.Name == name {
@@ -1030,28 +967,10 @@ func (m *Model) profileByName(name string) (profile.Profile, bool) {
 	return profile.Profile{}, false
 }
 
-func (m *Model) openProjectReconcile() {
-	target, missingGroups, err := m.projectTarget()
-	if err != nil {
-		m.setMessage(messageError, err.Error())
-		return
-	}
-	m.plan = reconcile.BuildWithPins(target, m.skills, m.pins)
-	for _, name := range missingGroups {
-		m.plan.Issues = append(m.plan.Issues, fmt.Sprintf("missing group %s", name))
-	}
-	slices.Sort(m.plan.Issues)
-	m.planKind = "project"
-	m.modal = modalReconcile
-}
-
 func (m *Model) appliedTargetForPlan() environment.Target {
 	target := environment.Target{
 		Kind: environment.Kind(m.planKind),
 		Name: m.plan.Group,
-	}
-	if target.Kind == environment.KindProject {
-		target.Path = m.projectPath
 	}
 	return target
 }
@@ -1067,7 +986,7 @@ func (m *Model) saveAppliedTarget() error {
 }
 
 func (m *Model) clearAppliedTarget(kind environment.Kind, name string) error {
-	if !m.targetMatches(kind, name, "") {
+	if !m.targetMatches(kind, name) {
 		return nil
 	}
 	if err := environment.New(m.paths.StatePath()).Clear(); err != nil {

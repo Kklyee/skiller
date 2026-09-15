@@ -18,13 +18,11 @@ type Kind string
 const (
 	KindGroup   Kind = "group"
 	KindProfile Kind = "profile"
-	KindProject Kind = "project"
 )
 
 type Target struct {
 	Kind Kind   `toml:"kind"`
 	Name string `toml:"name"`
-	Path string `toml:"path,omitempty"`
 }
 
 type Status string
@@ -57,6 +55,9 @@ func (s Store) Load() (Target, bool, error) {
 		return Target{}, false, fmt.Errorf("read environment state %q: %w", s.Path, err)
 	}
 	if err := target.Validate(); err != nil {
+		if target.Kind == Kind("project") {
+			return Target{}, false, nil
+		}
 		return Target{}, false, fmt.Errorf("validate environment state %q: %w", s.Path, err)
 	}
 	return target, true, nil
@@ -96,13 +97,6 @@ func (s Store) Clear() error {
 func (t Target) Validate() error {
 	switch t.Kind {
 	case KindGroup, KindProfile:
-		if t.Path != "" {
-			return fmt.Errorf("%s target must not have a path", t.Kind)
-		}
-	case KindProject:
-		if strings.TrimSpace(t.Path) == "" {
-			return errors.New("project target path must not be empty")
-		}
 	default:
 		return fmt.Errorf("unsupported environment target kind %q", t.Kind)
 	}

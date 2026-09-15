@@ -254,7 +254,6 @@ func (m *Model) paletteCommands() []paletteCommand {
 	return []paletteCommand{
 		{id: "groups", title: "Groups", description: "open group management"},
 		{id: "profiles", title: "Profiles", description: "open profile environments"},
-		{id: "project", title: "Project", description: "open project environment"},
 		{id: "use", title: "Use selected group", description: "preview the current group"},
 		{id: "doctor", title: "Doctor", description: "inspect environment health"},
 		{id: "help", title: "Help", description: "show keyboard help"},
@@ -308,8 +307,6 @@ func (m *Model) executePaletteCommand() {
 		m.openGroups()
 	case "profiles":
 		m.openProfiles()
-	case "project":
-		m.openProject()
 	case "use":
 		m.openReconcile()
 	case "doctor":
@@ -450,10 +447,7 @@ func (m *Model) viewDeleteGroupModal() string {
 }
 
 func (m *Model) viewReconcileModal() string {
-	if m.planKind == "group" {
-		return m.viewActivationModal()
-	}
-	return m.viewReconcileDiffModal()
+	return m.viewActivationModal()
 }
 
 func (m *Model) viewActivationModal() string {
@@ -502,73 +496,6 @@ func (m *Model) viewActivationModal() string {
 	}, "\n")
 }
 
-func (m *Model) viewReconcileDiffModal() string {
-	lines := []string{reconcileSectionStyle(messageSuccess, "Enable", len(m.plan.Enable))}
-	for _, id := range m.plan.Enable {
-		lines = append(lines, messageStyle(messageSuccess).Render("  + "+id))
-	}
-	lines = append(lines, m.reconcileDivider(), reconcileSectionStyle(messageError, "Disable", len(m.plan.Disable)))
-	for _, id := range m.plan.Disable {
-		lines = append(lines, messageStyle(messageError).Render("  - "+id))
-	}
-	lines = append(lines, m.reconcileDivider(), reconcileSectionStyle(messageInfo, "Keep", len(m.plan.Keep)))
-	if len(m.plan.KeepActive)+len(m.plan.KeepDisabled) == len(m.plan.Keep) {
-		if len(m.plan.KeepActive) > 0 {
-			lines = append(lines, messageStyle(messageSuccess).Render(fmt.Sprintf("  active (%d)", len(m.plan.KeepActive))))
-			for _, id := range m.plan.KeepActive {
-				lines = append(lines, messageStyle(messageSuccess).Render("    = "+id))
-			}
-		}
-		if len(m.plan.KeepDisabled) > 0 {
-			lines = append(lines, helpTextStyle().Render(fmt.Sprintf("  disabled (%d)", len(m.plan.KeepDisabled))))
-			for _, id := range m.plan.KeepDisabled {
-				lines = append(lines, helpTextStyle().Render("    = "+id))
-			}
-		}
-	} else {
-		for _, id := range m.plan.Keep {
-			lines = append(lines, helpTextStyle().Render("  = "+id))
-		}
-	}
-	if len(m.plan.Missing) > 0 {
-		lines = append(lines, m.reconcileDivider(), reconcileSectionStyle(messageInfo, "Missing", len(m.plan.Missing)))
-		for _, id := range m.plan.Missing {
-			lines = append(lines, messageStyle(messageInfo).Render("  ? "+id))
-		}
-	}
-	if len(m.plan.Issues) > 0 {
-		lines = append(lines, m.reconcileDivider(), reconcileSectionStyle(messageError, "Issues", len(m.plan.Issues)))
-		for _, issue := range m.plan.Issues {
-			lines = append(lines, messageStyle(messageError).Render("  ! "+issue))
-		}
-	}
-	lines = append(lines,
-		m.reconcileDivider(),
-		"",
-		helpTextStyle().Bold(true).Render("Summary"),
-		strings.Join([]string{
-			messageStyle(messageSuccess).Render(fmt.Sprintf("%d enable", len(m.plan.Enable))),
-			messageStyle(messageError).Render(fmt.Sprintf("%d disable", len(m.plan.Disable))),
-			helpTextStyle().Render(fmt.Sprintf("%d unchanged", len(m.plan.Keep))),
-		}, "  "),
-	)
-	if len(m.plan.KeepActive)+len(m.plan.KeepDisabled) == len(m.plan.Keep) {
-		lines = append(lines, helpTextStyle().Render(fmt.Sprintf("(%d active, %d disabled)", len(m.plan.KeepActive), len(m.plan.KeepDisabled))))
-	}
-	if m.plan.HasIssues() {
-		lines = append(lines, "Cannot apply until issues are resolved")
-	}
-	if m.message != "" {
-		lines = append(lines, "", m.renderedMessage())
-	}
-
-	return strings.Join([]string{
-		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Reconcile"),
-		m.panel(m.reconcileTitle(), strings.Join(lines, "\n"), m.width, m.height-3, true),
-		renderKeyHints(keyHint{key: "enter", description: "apply"}, keyHint{key: "esc", description: "cancel"}),
-	}, "\n")
-}
-
 func reconcileSectionStyle(kind messageKind, title string, count int) string {
 	return messageStyle(kind).Render(fmt.Sprintf("%s (%d)", title, count))
 }
@@ -585,8 +512,6 @@ func (m *Model) reconcileTitle() string {
 	label := "Group"
 	if m.planKind == "profile" {
 		label = "Profile"
-	} else if m.planKind == "project" {
-		label = "Project"
 	}
 	return "Activate " + label + ": " + m.plan.Group
 }

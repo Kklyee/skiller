@@ -18,7 +18,7 @@ func TestCompletionCommandGeneratesSupportedShells(t *testing.T) {
 	for _, shell := range completionShells {
 		t.Run(shell, func(t *testing.T) {
 			root := &cobra.Command{Use: "skiller"}
-			root.AddCommand(NewCompletion(), &cobra.Command{Use: "profile"}, &cobra.Command{Use: "sync"}, &cobra.Command{Use: "run"})
+			root.AddCommand(NewCompletion(), &cobra.Command{Use: "profile"}, &cobra.Command{Use: "group"}, &cobra.Command{Use: "use"})
 			var output bytes.Buffer
 			root.SetArgs([]string{"completion", shell})
 			root.SetOut(&output)

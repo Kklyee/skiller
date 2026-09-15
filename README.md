@@ -4,7 +4,7 @@ Skiller 是面向 AI 编程 Agent 的本地 Skill Environment Controller，提�
 TUI 两种方式管理已安装 Skill 的工作环境。
 
 它可以决定哪些 Skill 当前对 Agent 可用，哪些 Skill 暂时停用，并按分组、Profile
-或项目配置快速切换。Skill 内容仍由原有安装器管理，Skiller 负责环境编排。
+快速切换。Skill 内容仍由原有安装器管理，Skiller 负责环境编排。
 
 ## 为什么开发
 
@@ -14,11 +14,11 @@ Skiller 把环境选择保存为可重复的配置，让切换和恢复更简单
 ## 核心能力
 
 - 查看并切换 `active`、`disabled`、`conflict`、`broken`、`invalid` 状态；
-- 使用 Group、Profile、项目配置组织 Skill 环境；
+- 使用 Group、Profile 组织 Skill 环境；
 - 用 pin 保证关键 Skill 始终保持 active；
 - 查看 Skill 来源、安装器、版本和实际位置；
 - 通过 `npx skills` 桥接安装、更新和移除；
-- 导出/导入环境，并用 `doctor` 检查问题。
+- 用 `doctor` 检查问题。
 
 ## 安装
 
@@ -82,43 +82,14 @@ skiller update code-review
 skiller remove code-review
 ```
 
-导出、导入和项目同步：
-
-```bash
-skiller export environment.toml
-skiller import environment.toml --install-missing
-skiller sync
-skiller sync --check
-```
-
-`sync --check` 只检查项目环境，发现漂移时返回退出码 `2`，适合 CI。
-
-## 项目配置
-
-在项目目录放置 `.skiller.toml`，选择 Profile 或直接列出 Skill：
-
-```toml
-profile = "go-backend"
-include = ["research"]
-exclude = ["frontend-design"]
-```
-
-也可以使用：
-
-```toml
-skills = ["code-review", "tdd"]
-```
-
-最终环境会叠加 pin，并排除 `exclude` 中的 Skill。
-
 ## TUI
 
 ```bash
 skiller tui
 ```
 
-主界面按 `Groups / Skills / Details` 展示环境；`p` 打开 Profiles，`o` 打开当前
-Project，`:` 打开命令面板。顶部的 `Group`、`Profile` 或 `Project` 表示最后一次应用的目标，
+主界面按 `Groups / Skills / Details` 展示环境；`p` 打开 Profiles，`:` 打开命令面板。顶部的
+`Group` 或 `Profile` 表示最后一次应用的目标，
 不是当前光标所在的项目。
 
 ```text
@@ -130,7 +101,7 @@ x           标记 Skill
 b           批量操作
 /           搜索
 g           Groups
-u           预览并应用当前 Group/Profile/Project
+u           预览并应用当前 Group/Profile
 Enter       进入分组或查看 Details
 ?           帮助
 q           退出
@@ -140,7 +111,7 @@ Details 面板为只读信息；只有 Skills 获得焦点时，`Space`、`a` �
 
 ### 环境状态
 
-Skill 的 `active` 和 `disabled` 是电脑上的实际状态。Group、Profile 和 Project 是目标环境：
+Skill 的 `active` 和 `disabled` 是电脑上的实际状态。Group 和 Profile 是目标环境：
 
 - `●` 表示目标已应用，实际 Skill 状态与目标一致；
 - `◐` 表示目标仍然是当前目标，但实际状态被手动修改过；
@@ -149,7 +120,7 @@ Skill 的 `active` 和 `disabled` 是电脑上的实际状态。Group、Profile 
 
 手动启用或禁用 Skill 不会悄悄切换当前目标，只会让目标进入 `Modified` 状态。再次使用目标
 即可重新同步。当前目标保存在 `~/.skiller/state.toml`，因此重新打开 TUI 后仍能识别最后使用的
-Group、Profile 或 Project。
+Group 或 Profile。
 
 ## 数据位置
 

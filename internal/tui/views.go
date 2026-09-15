@@ -11,7 +11,6 @@ import (
 	skillprovenance "github.com/Kklyee/skiller/internal/provenance"
 	"github.com/Kklyee/skiller/internal/reconcile"
 	"github.com/charmbracelet/x/ansi"
-	"path/filepath"
 	"strings"
 )
 
@@ -68,8 +67,6 @@ func (m *Model) viewContent() string {
 		return m.viewProfiles()
 	case ScreenProfileEditor:
 		return m.viewProfileEditor()
-	case ScreenProject:
-		return m.viewProject()
 	default:
 		return m.viewMain()
 	}
@@ -288,7 +285,7 @@ func (m *Model) viewProfileList() string {
 		if stored.Name == m.selectedProfile {
 			prefix = selectedRowStyle().Render("›") + " "
 		}
-		status := m.statusForTarget(environment.KindProfile, stored.Name, "")
+		status := m.statusForTarget(environment.KindProfile, stored.Name)
 		marker := environmentStatusStyle(status).Render(environmentStatusIcon(status))
 		name := groupNameStyle().Render(stored.Name)
 		if stored.Name == m.selectedProfile {
@@ -312,7 +309,7 @@ func (m *Model) viewProfileDetails() string {
 		return helpTextStyle().Render("Select a profile to inspect its environment")
 	}
 	target := profile.Resolve(stored, m.groups)
-	profileStatus := m.statusForTarget(environment.KindProfile, stored.Name, "")
+	profileStatus := m.statusForTarget(environment.KindProfile, stored.Name)
 	status := environmentStatusStyle(profileStatus).Render(environmentStatusIcon(profileStatus) + " " + environmentStatusLabel(profileStatus))
 	lines := []string{
 		"Name: " + groupNameStyle().Render(stored.Name),
@@ -333,90 +330,6 @@ func (m *Model) viewProfileDetails() string {
 
 func profileSummary(stored profile.Profile) string {
 	return fmt.Sprintf("%d groups  %d skills  %d excluded", len(stored.Groups), len(stored.Skills), len(stored.Exclude))
-}
-
-func (m *Model) viewProject() string {
-	leftWidth := m.width / 3
-	if leftWidth < 34 {
-		leftWidth = 34
-	}
-	if leftWidth > 48 {
-		leftWidth = 48
-	}
-	if leftWidth > m.width-24 {
-		leftWidth = m.width - 24
-	}
-	if leftWidth < 4 {
-		leftWidth = 4
-	}
-	rightWidth := m.width - leftWidth
-	panelHeight := m.height - 3
-	if panelHeight < 3 {
-		panelHeight = 3
-	}
-	footer := renderKeyHints(
-		keyHint{key: "u/enter", description: "use"},
-		keyHint{key: "r", description: "reload"},
-		keyHint{key: "esc", description: "back"},
-	)
-	return strings.Join([]string{
-		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Project"),
-		lipgloss.JoinHorizontal(
-			lipgloss.Top,
-			m.panel("Configuration", m.viewProjectConfig(), leftWidth, panelHeight, true),
-			m.panel("Effective Environment", m.viewProjectDetails(), rightWidth, panelHeight, false),
-		),
-		footer,
-	}, "\n")
-}
-
-func (m *Model) viewProjectConfig() string {
-	if !m.projectLoaded {
-		lines := []string{helpTextStyle().Render("No .skiller.toml found")}
-		if m.projectError != "" {
-			lines = append(lines, "", helpTextStyle().Render(m.projectError))
-		}
-		return strings.Join(lines, "\n")
-	}
-	base := "Skills"
-	baseValue := m.projectConfig.Skills
-	if m.projectConfig.Profile != "" {
-		base = "Profile"
-		baseValue = []string{m.projectConfig.Profile}
-	}
-	return strings.Join([]string{
-		"File: " + helpTextStyle().Render(m.projectPath),
-		base + ": " + listOrDash(baseValue),
-		"Include: " + listOrDash(m.projectConfig.Include),
-		"Exclude: " + listOrDash(m.projectConfig.Exclude),
-	}, "\n")
-}
-
-func (m *Model) viewProjectDetails() string {
-	if !m.projectLoaded {
-		return helpTextStyle().Render("Create .skiller.toml to define a project environment")
-	}
-	target, missingGroups, err := m.projectTarget()
-	if err != nil {
-		return messageStyle(messageError).Render(err.Error())
-	}
-	lines := []string{
-		"Desired active: " + fmt.Sprintf("%d skills", len(target.Skills)),
-		"Status: " + m.projectStatus(),
-		"Skills: " + listOrDash(target.Skills),
-	}
-	if len(missingGroups) > 0 {
-		lines = append(lines, messageStyle(messageError).Render("Missing groups: "+strings.Join(missingGroups, ", ")))
-	}
-	if missing := profile.MissingSkills(profile.Target{Group: target}, m.skills); len(missing) > 0 {
-		lines = append(lines, messageStyle(messageError).Render("Missing skills: "+strings.Join(missing, ", ")))
-	}
-	return strings.Join(lines, "\n")
-}
-
-func (m *Model) projectStatus() string {
-	status := m.statusForTarget(environment.KindProject, "project", m.projectPath)
-	return environmentStatusStyle(status).Render(environmentStatusIcon(status) + " " + environmentStatusLabel(status))
 }
 
 func listOrDash(values []string) string {
@@ -446,11 +359,6 @@ func (m *Model) viewTargetHeader() string {
 	switch m.appliedTarget.Kind {
 	case environment.KindProfile:
 		label = "Profile"
-	case environment.KindProject:
-		label = "Project"
-		if m.appliedTarget.Path != "" {
-			name = filepath.Base(filepath.Dir(m.appliedTarget.Path))
-		}
 	}
 	return environmentStatusStyle(m.targetStatus).Render(label + ": " + name)
 }
@@ -469,14 +377,14 @@ func headerMetric(label string, value int, color string) string {
 
 func (m *Model) viewGroupPanel() string {
 	allMarker := "  "
-	allStatus := m.statusForTarget(environment.KindGroup, allGroupName, "")
+	allStatus := m.statusForTarget(environment.KindGroup, allGroupName)
 	if allStatus != environment.StatusManual {
 		allMarker = environmentStatusStyle(allStatus).Render(environmentStatusIcon(allStatus)) + " "
 	}
 	lines := []string{allMarker + groupNameStyle().Render("All") + "  " + fmt.Sprintf("%d", len(m.skills))}
 	for _, group := range m.groups {
 		marker := "  "
-		status := m.statusForTarget(environment.KindGroup, group.Name, "")
+		status := m.statusForTarget(environment.KindGroup, group.Name)
 		if status != environment.StatusManual {
 			marker = environmentStatusStyle(status).Render(environmentStatusIcon(status)) + " "
 		}
@@ -661,7 +569,6 @@ func (m *Model) viewFooter() string {
 		keyHint{key: "/", description: "search"},
 		keyHint{key: "g", description: "groups"},
 		keyHint{key: "p", description: "profiles"},
-		keyHint{key: "o", description: "project"},
 		keyHint{key: ":", description: "commands"},
 		keyHint{key: "u", description: "use"},
 	)
@@ -748,7 +655,7 @@ func (m *Model) viewGroupManagerList() string {
 			prefix = selectedRowStyle().Render("›") + " "
 		}
 		marker := "  "
-		status := m.statusForTarget(environment.KindGroup, group.Name, "")
+		status := m.statusForTarget(environment.KindGroup, group.Name)
 		if status != environment.StatusManual {
 			marker = environmentStatusStyle(status).Render(environmentStatusIcon(status)) + " "
 		}
@@ -783,7 +690,7 @@ func (m *Model) viewGroupManagerDetails(width int) string {
 		return helpTextStyle().Render("Select a group to inspect its members")
 	}
 
-	groupStatus := m.statusForTarget(environment.KindGroup, group.Name, "")
+	groupStatus := m.statusForTarget(environment.KindGroup, group.Name)
 	status := environmentStatusStyle(groupStatus).Render(environmentStatusIcon(groupStatus) + " " + environmentStatusLabel(groupStatus))
 	lines := []string{status, "", helpTextStyle().Bold(true).Render("Members")}
 	if len(group.Skills) == 0 {
@@ -974,7 +881,6 @@ func (m *Model) viewHelp() string {
 		helpLine("g", "group management"),
 		helpLine("p", "profile environments"),
 		helpLine("n/e/d", "new, edit, or delete on management screens"),
-		helpLine("o", "project environment"),
 		helpLine(":", "command palette"),
 		helpLine("u", "preview and apply selected group"),
 		helpLine("enter", "expand details"),
