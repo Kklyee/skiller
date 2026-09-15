@@ -373,13 +373,20 @@ func TestMainViewColumnsKeepEqualHeightAfterShrink(t *testing.T) {
 	}
 	model.Update(bubbletea.WindowSizeMsg{Width: 180, Height: 50})
 	model.Update(bubbletea.WindowSizeMsg{Width: 120, Height: 30})
-	view := viewText(&model)
-	for _, line := range strings.Split(view, "\n") {
-		if strings.Count(line, "╰")+strings.Count(line, "└") == 3 {
-			return
+	for _, size := range [][2]int{{120, 30}, {100, 24}} {
+		model.Update(bubbletea.WindowSizeMsg{Width: size[0], Height: size[1]})
+		view := viewText(&model)
+		aligned := false
+		for _, line := range strings.Split(view, "\n") {
+			if strings.Count(line, "╰")+strings.Count(line, "└") == 3 {
+				aligned = true
+				break
+			}
+		}
+		if !aligned {
+			t.Fatalf("main column bottom borders do not share one row at %dx%d:\n%s", size[0], size[1], view)
 		}
 	}
-	t.Fatalf("main column bottom borders do not share one row:\n%s", view)
 }
 
 func TestSkillsPanelScrollsSelectedSkillIntoView(t *testing.T) {

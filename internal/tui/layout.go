@@ -106,13 +106,15 @@ func mainColumnBody(column mainColumn, height int) string {
 		border = lipgloss.RoundedBorder()
 		borderColor = lipgloss.Color("6")
 	}
-	style := lipgloss.NewStyle().
+	inner := lipgloss.NewStyle().
 		Width(contentWidth).
-		Height(height).
-		MaxHeight(height).
+		Height(height - 2).
+		MaxHeight(height - 2).
+		Render(column.content)
+	return lipgloss.NewStyle().
 		Border(border).
-		BorderForeground(borderColor)
-	return style.Render(column.content)
+		BorderForeground(borderColor).
+		Render(inner)
 }
 
 func mainColumnHeader(title string, width int, focused bool) string {
