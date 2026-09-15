@@ -6,6 +6,16 @@ TUI 两种方式管理已安装 Skill 的工作环境。
 它可以决定哪些 Skill 当前对 Agent 可用，哪些 Skill 暂时停用，并按分组、Profile
 快速切换。Skill 内容仍由原有安装器管理，Skiller 负责环境编排。
 
+## 产品界面
+
+主界面集中展示当前的 Group、Skill 状态和 Skill 详情，方便快速了解当前环境：
+
+![Skiller TUI 主界面](docs/images/skiller-tui.png)
+
+切换 Group 前可以先查看激活预览，确认哪些 Skill 会启用、哪些 Skill 会停用：
+
+![Skiller Group 切换预览](docs/images/skiller-reconcile.png)
+
 ## 为什么开发
 
 Skill 数量增多后，所有项目共用同一套环境容易变得混乱，也容易误启用或误删除。
