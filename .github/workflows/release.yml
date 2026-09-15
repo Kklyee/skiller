@@ -48,6 +48,11 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
       - name: Build and upload npm archives
         shell: bash
         run: |
@@ -57,6 +62,11 @@ jobs:
           output_dir="$RUNNER_TEMP/skiller-npm"
           ldflags="-s -w -X github.com/Kklyee/skiller/internal/version.Version=${version} -X github.com/Kklyee/skiller/internal/version.Commit=${GITHUB_SHA} -X github.com/Kklyee/skiller/internal/version.Date=${commit_date}"
           mkdir -p "$output_dir"
+
+          pushd packages/npm
+          npm version "$version" --no-git-tag-version
+          npm pack --ignore-scripts --pack-destination "$output_dir"
+          popd
 
           for target in "linux amd64" "linux arm64" "darwin amd64" "darwin arm64" "windows amd64" "windows arm64"; do
             read -r goos goarch <<< "$target"
@@ -70,11 +80,12 @@ jobs:
             tar -czf "$output_dir/skiller-npm_${version}_${goos}_${goarch}.tar.gz" -C "$target_dir" "$binary_name"
           done
 
-          gh release upload "$GITHUB_REF_NAME" "$output_dir"/*.tar.gz --clobber
+          gh release upload "$GITHUB_REF_NAME" "$output_dir"/*.tar.gz "$output_dir/skiller-cli-${version}.tgz" --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   npm:
+    if: ${{ vars.NPM_PUBLISH == 'true' }}
     name: Publish npm package
     needs: npm-assets
     runs-on: ubuntu-latest

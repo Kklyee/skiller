@@ -37,12 +37,20 @@ cd skiller
 go build -o skiller ./cmd/skiller
 ```
 
-如果电脑上没有 Go，也可以通过 npm 安装预编译版本。npm 包会根据当前系统和 CPU 架构下载对应的 Skiller，支持 Linux、macOS 和 Windows 的 x64、arm64：
+如果电脑上没有 Go，也可以通过 npm 安装预编译版本。npm 包会根据当前系统和 CPU 架构下载对应的 Skiller，支持 Linux、macOS 和 Windows 的 x64、arm64。
+
+不需要 npm 账号时，可以直接从 GitHub Release 安装 npm 包：
+
+```bash
+npm install --global https://github.com/Kklyee/skiller/releases/download/v0.1.0/skiller-cli-0.1.0.tgz
+skiller --version
+skiller tui
+```
+
+如果 npm 包已经发布到官方仓库，也可以使用更短的命令：
 
 ```bash
 npm install --global skiller-cli
-skiller --version
-skiller tui
 ```
 
 升级和卸载：
@@ -55,14 +63,15 @@ npm uninstall --global skiller-cli
 npm 安装只需要 Node.js 和 npm，不会替电脑安装 Go。npm 包只是 Skiller 的分发方式，Group、Profile、Pin
 和 Skill 数据仍然按照 Skiller 的默认目录保存。
 
-维护者发布新版本时，给仓库配置 `NPM_TOKEN` Secret，然后推送版本标签：
+维护者发布新版本时，只需要推送版本标签，GitHub Release 会自动生成二进制和 npm 安装包：
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-Release 工作流会构建 GitHub Release、生成六个平台归档，并自动发布对应版本的 `skiller-cli`。
+如果之后可以正常使用 npm 注册，再在仓库中配置 `NPM_TOKEN` Secret 和 `NPM_PUBLISH=true`
+Repository Variable，Release 工作流就会额外把 `skiller-cli` 发布到 npm 官方仓库。
 
 ## 快速开始
 
