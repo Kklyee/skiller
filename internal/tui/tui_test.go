@@ -315,10 +315,20 @@ func TestSkillsPanelShowsMultiSelectToolbar(t *testing.T) {
 	model.Update(keyCode(bubbletea.KeyDown))
 	model.Update(keyText("x"))
 	toolbar := ansi.Strip(model.viewSkillsPanel())
-	for _, want := range []string{"2 selected", "b batch", "c clear"} {
+	for _, want := range []string{"2 selected", "b batch"} {
 		if !strings.Contains(toolbar, want) {
 			t.Fatalf("skills toolbar missing %q:\n%s", want, toolbar)
 		}
+	}
+	if strings.Contains(toolbar, "c clear") {
+		t.Fatalf("skills toolbar should not show the clear shortcut:\n%s", toolbar)
+	}
+	if footer := ansi.Strip(model.viewFooter()); strings.Contains(footer, "a all") || strings.Contains(footer, "c clear") {
+		t.Fatalf("skills footer should hide the select-all and clear shortcuts:\n%s", footer)
+	}
+	model.Update(keyText("c"))
+	if model.selectedSkillCount() != 0 {
+		t.Fatalf("clear shortcut no longer clears marked skills: %v", model.selectedSkills)
 	}
 }
 
@@ -887,8 +897,8 @@ func TestSkillsFocusATogglesAllVisibleSkills(t *testing.T) {
 		t.Fatalf("new model: %v", err)
 	}
 	model.Update(keyCode(bubbletea.KeyTab))
-	if footer := ansi.Strip(model.viewFooter()); !strings.Contains(footer, "a all") {
-		t.Fatalf("skills footer missing select-all action:\n%s", footer)
+	if footer := ansi.Strip(model.viewFooter()); strings.Contains(footer, "a all") || strings.Contains(footer, "c clear") {
+		t.Fatalf("skills footer should hide the select-all and clear shortcuts:\n%s", footer)
 	}
 
 	model.Update(keyText("a"))
@@ -1406,7 +1416,6 @@ func TestTUIShowsPinnedSkillsAndKeepsThemActive(t *testing.T) {
 		t.Fatalf("new model: %v", err)
 	}
 	model.Update(keyCode(bubbletea.KeyTab))
-	model.Update(keyCode(bubbletea.KeyDown))
 
 	view := viewText(&model)
 	if !strings.Contains(view, "○ Beta [beta] ◆") {
@@ -1425,6 +1434,44 @@ func TestTUIShowsPinnedSkillsAndKeepsThemActive(t *testing.T) {
 	}
 	if !strings.Contains(viewText(&model), "unpin it first") {
 		t.Fatalf("pinned toggle message missing:\n%s", viewText(&model))
+	}
+}
+
+func TestVisibleSkillsSortsPinnedActiveAndDisabled(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	pinsPath := filepath.Join(root, "pins.toml")
+
+	createSkill(t, activeDir, "z-active", "Z Active", "")
+	createSkill(t, activeDir, "a-active", "A Active", "")
+	createSkill(t, activeDir, "pinned-active", "Pinned Active", "")
+	createSkill(t, disabledDir, "z-disabled", "Z Disabled", "")
+	createSkill(t, disabledDir, "a-disabled", "A Disabled", "")
+	if _, err := pin.New(pinsPath).Add("pinned-active", "a-disabled"); err != nil {
+		t.Fatalf("pin skills: %v", err)
+	}
+
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: disabledDir,
+		Pins:     pinsPath,
+		Groups:   filepath.Join(root, "groups"),
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+
+	visible := model.visibleSkills()
+	ids := make([]string, 0, len(visible))
+	for _, skill := range visible {
+		ids = append(ids, skill.ID)
+	}
+	want := []string{"a-disabled", "pinned-active", "a-active", "z-active", "z-disabled"}
+	if !slices.Equal(ids, want) {
+		t.Fatalf("visible skill order = %v, want %v", ids, want)
 	}
 }
 
@@ -1589,7 +1636,6 @@ func TestMultiSelectBatchGroupRemoveKeepsPinnedSkills(t *testing.T) {
 		t.Fatalf("new model: %v", err)
 	}
 	model.Update(keyCode(bubbletea.KeyTab))
-	model.Update(keyCode(bubbletea.KeyDown))
 	model.Update(keyText("x"))
 	model.Update(keyText("b"))
 	model.Update(keyText("r"))

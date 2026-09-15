@@ -537,7 +537,7 @@ func (m *Model) viewSelectionToolbar() string {
 		return ""
 	}
 	return selectionStyle().Render(fmt.Sprintf("✓ %d selected", m.selectedSkillCount())) + "  " +
-		renderKeyHints(keyHint{key: "b", description: "batch"}, keyHint{key: "c", description: "clear"})
+		renderKeyHints(keyHint{key: "b", description: "batch"})
 }
 
 func (m *Model) viewSearchBar(matches int) string {
@@ -653,10 +653,8 @@ func (m *Model) viewFooter() string {
 	if m.focus == FocusSkills {
 		hints = append(hints,
 			keyHint{key: "space", description: "toggle"},
-			keyHint{key: "a", description: "all"},
 			keyHint{key: "x", description: "mark"},
 			keyHint{key: "b", description: "batch"},
-			keyHint{key: "c", description: "clear"},
 		)
 	}
 	hints = append(hints,

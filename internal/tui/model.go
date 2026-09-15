@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"cmp"
 	"fmt"
 	"github.com/Kklyee/skiller/internal/catalog"
 	"github.com/Kklyee/skiller/internal/doctor"
@@ -632,7 +633,27 @@ func (m *Model) visibleSkills() []catalog.Skill {
 		visible = append(visible, skill)
 	}
 
+	slices.SortFunc(visible, func(a, b catalog.Skill) int {
+		if rankA, rankB := m.skillSortRank(a), m.skillSortRank(b); rankA != rankB {
+			return cmp.Compare(rankA, rankB)
+		}
+		return cmp.Compare(a.ID, b.ID)
+	})
+
 	return visible
+}
+
+func (m *Model) skillSortRank(skill catalog.Skill) int {
+	if m.isPinned(skill.ID) {
+		return 0
+	}
+	if skill.State == catalog.StateActive {
+		return 1
+	}
+	if skill.State == catalog.StateDisabled {
+		return 2
+	}
+	return 3
 }
 
 func (m *Model) matches(skill catalog.Skill, query string) bool {
