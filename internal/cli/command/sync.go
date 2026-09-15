@@ -93,10 +93,10 @@ func syncPlan(pathSet paths.Set) (reconcile.Plan, string, error) {
 			return reconcile.Plan{}, "", err
 		}
 		target := profile.Resolve(stored, groups)
-		selected = target.Group
+		selected = project.ApplyOverrides(target.Group, config.Include, config.Exclude)
 		missingGroups = target.MissingGroups
 	} else {
-		selected = group.Group{Name: "project", Skills: config.Skills}
+		selected = project.ApplyOverrides(group.Group{Name: "project", Skills: config.Skills}, config.Include, config.Exclude)
 	}
 
 	plan := reconcile.BuildWithPins(selected, skills, pinned)

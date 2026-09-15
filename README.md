@@ -131,6 +131,8 @@ Bundle 保存 active 快照、pins、groups、profiles 和 Skill 来源。导入
 
 ```toml
 profile = "go-backend"
+include = ["research"]
+exclude = ["frontend-design"]
 ```
 
 或者：
@@ -138,6 +140,9 @@ profile = "go-backend"
 ```toml
 skills = ["code-review", "tdd"]
 ```
+
+`include` 和 `exclude` 是项目级覆盖项，最终环境按“基础集合 + include - exclude”，
+再叠加 pins 计算。
 
 在项目目录执行：
 

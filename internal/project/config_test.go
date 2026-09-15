@@ -35,6 +35,28 @@ func TestLoadFileSkills(t *testing.T) {
 	}
 }
 
+func TestLoadFileSupportsProjectOverrides(t *testing.T) {
+	path := filepath.Join(t.TempDir(), ConfigFileName)
+	writeConfig(t, path, "profile = \"backend\"\ninclude = [\"research\"]\nexclude = [\"wizard\"]\n")
+
+	config, err := LoadFile(path)
+	if err != nil {
+		t.Fatalf("load project overrides: %v", err)
+	}
+	if config.Profile != "backend" || !sameStrings(config.Include, []string{"research"}) || !sameStrings(config.Exclude, []string{"wizard"}) {
+		t.Fatalf("config: %#v", config)
+	}
+}
+
+func TestLoadFileRejectsDuplicateProjectOverrides(t *testing.T) {
+	path := filepath.Join(t.TempDir(), ConfigFileName)
+	writeConfig(t, path, "skills = [\"code-review\"]\ninclude = [\"research\", \"research\"]\n")
+
+	if _, err := LoadFile(path); err == nil || !strings.Contains(err.Error(), "include skill") {
+		t.Fatalf("duplicate include error: %v", err)
+	}
+}
+
 func TestLoadFileRejectsInvalidSources(t *testing.T) {
 	tests := []struct {
 		name string

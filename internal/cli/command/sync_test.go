@@ -105,6 +105,53 @@ func TestSyncProfile(t *testing.T) {
 	}
 }
 
+func TestSyncProjectOverridesProfile(t *testing.T) {
+	root := t.TempDir()
+	projectDir := filepath.Join(root, "project")
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	groupsDir := filepath.Join(root, "groups")
+	profilesDir := filepath.Join(root, "profiles")
+	createSkill(t, activeDir, "base")
+	createSkill(t, activeDir, "excluded")
+	createSkill(t, disabledDir, "included")
+	createSkill(t, disabledDir, "old")
+
+	groups := group.New(groupsDir)
+	if _, err := groups.Create("coding"); err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	if _, err := groups.Add("coding", "base"); err != nil {
+		t.Fatalf("add group skill: %v", err)
+	}
+	profiles := profile.New(profilesDir)
+	if _, err := profiles.Create("backend"); err != nil {
+		t.Fatalf("create profile: %v", err)
+	}
+	if err := profiles.Update("backend", profile.Profile{Name: "backend", Groups: []string{"coding"}}); err != nil {
+		t.Fatalf("update profile: %v", err)
+	}
+	writeProjectConfig(t, projectDir, "profile = \"backend\"\ninclude = [\"included\"]\nexclude = [\"excluded\"]\n")
+	setSyncPaths(t, activeDir, disabledDir, groupsDir, profilesDir)
+	t.Chdir(projectDir)
+
+	var output bytes.Buffer
+	cmd := NewSync()
+	cmd.SetArgs([]string{"--dry-run"})
+	cmd.SetOut(&output)
+	cmd.SetErr(&output)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("sync project overrides: %v\n%s", err, output.String())
+	}
+	text := output.String()
+	if !strings.Contains(text, "  + included") || !strings.Contains(text, "  - excluded") || !strings.Contains(text, "  = base") {
+		t.Fatalf("override plan: %q", text)
+	}
+}
+
 func TestSyncRequiresProjectConfig(t *testing.T) {
 	root := t.TempDir()
 	projectDir := filepath.Join(root, "project")

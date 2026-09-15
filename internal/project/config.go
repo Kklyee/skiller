@@ -16,6 +16,8 @@ const ConfigFileName = ".skiller.toml"
 type Config struct {
 	Profile string   `toml:"profile"`
 	Skills  []string `toml:"skills"`
+	Include []string `toml:"include"`
+	Exclude []string `toml:"exclude"`
 }
 
 func Find(start string) (string, error) {
@@ -101,16 +103,25 @@ func validate(config Config, metadata toml.MetaData) error {
 		if strings.TrimSpace(config.Profile) == "" {
 			return errors.New("profile must not be empty")
 		}
-		return nil
+	} else {
+		if err := validateSkills(config.Skills, "skill"); err != nil {
+			return err
+		}
 	}
+	if err := validateSkills(config.Include, "include skill"); err != nil {
+		return err
+	}
+	return validateSkills(config.Exclude, "exclude skill")
+}
 
-	seen := make(map[string]struct{}, len(config.Skills))
-	for _, skill := range config.Skills {
+func validateSkills(skills []string, kind string) error {
+	seen := make(map[string]struct{}, len(skills))
+	for _, skill := range skills {
 		if strings.TrimSpace(skill) == "" {
-			return errors.New("skill ID must not be empty")
+			return fmt.Errorf("%s ID must not be empty", kind)
 		}
 		if _, ok := seen[skill]; ok {
-			return fmt.Errorf("skill %q is listed more than once", skill)
+			return fmt.Errorf("%s %q is listed more than once", kind, skill)
 		}
 		seen[skill] = struct{}{}
 	}
