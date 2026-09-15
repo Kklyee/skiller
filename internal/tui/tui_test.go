@@ -265,6 +265,28 @@ func TestCommandPaletteFiltersAndExecutesNavigation(t *testing.T) {
 	}
 }
 
+func TestDetailsPanelShowsDiagnosticsForConflict(t *testing.T) {
+	model := Model{
+		skills: []catalog.Skill{{
+			ID: "duplicate", State: catalog.StateConflict,
+			ActivePath: "C:/active/duplicate", DisabledPath: "C:/disabled/duplicate",
+			ActiveIssue: "duplicate active and disabled copies",
+			Name:        "Duplicate", Description: "Two copies",
+		}},
+		selectedSkill: "duplicate",
+	}
+	view := ansi.Strip(model.viewDetailsPanel())
+	for _, want := range []string{
+		"Issue: duplicate active and disabled copies",
+		"Active path: C:/active/duplicate",
+		"Disabled path: C:/disabled/duplicate",
+	} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("diagnostic details missing %q:\n%s", want, view)
+		}
+	}
+}
+
 func TestDetailsPanelShowsSkillProvenance(t *testing.T) {
 	root := t.TempDir()
 	activeDir := filepath.Join(root, "active")

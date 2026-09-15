@@ -520,12 +520,44 @@ func (m *Model) viewDetailsPanel() string {
 			lines = append(lines, "Update source: "+source)
 		}
 	}
+	lines = append(lines, diagnosticDetails(skill)...)
 	pinned := "no"
 	if m.isPinned(skill.ID) {
 		pinned = pinStyle().Render("yes")
 	}
 	lines = append(lines, "Pinned: "+pinned)
 	return strings.Join(lines, "\n")
+}
+
+func diagnosticDetails(skill catalog.Skill) []string {
+	issue := skill.ActiveIssue
+	if issue == "" {
+		issue = skill.DisabledIssue
+	}
+	switch skill.State {
+	case catalog.StateConflict:
+		lines := []string{
+			"Issue: " + messageStyle(messageError).Render(valueOrDash(issue)),
+			"Active path: " + helpTextStyle().Render(valueOrDash(skill.ActivePath)),
+			"Disabled path: " + helpTextStyle().Render(valueOrDash(skill.DisabledPath)),
+		}
+		return lines
+	case catalog.StateBroken, catalog.StateInvalid:
+		path := skill.ActivePath
+		if path == "" {
+			path = skill.DisabledPath
+		}
+		lines := []string{"Issue: " + messageStyle(messageError).Render(valueOrDash(issue))}
+		if path != "" {
+			lines = append(lines, "Path: "+helpTextStyle().Render(path))
+		}
+		if skill.SkillFile != "" {
+			lines = append(lines, "SKILL.md: "+helpTextStyle().Render(skill.SkillFile))
+		}
+		return lines
+	default:
+		return nil
+	}
 }
 
 func updateSource(origin skillprovenance.Entry) string {
