@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Kklyee/skiller/internal/environment"
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/pin"
 )
@@ -54,6 +55,9 @@ func TestUseDryRun(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(activeDir, "old")); err != nil {
 		t.Fatalf("dry run changed active skill: %v", err)
 	}
+	if _, ok, err := environment.New(filepath.Join(root, "state.toml")).Load(); err != nil || ok {
+		t.Fatalf("dry run changed applied target: target=%v error=%v", ok, err)
+	}
 }
 
 func TestUseConfirmsAndApplies(t *testing.T) {
@@ -89,6 +93,13 @@ func TestUseConfirmsAndApplies(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(disabledDir, "old", "SKILL.md")); err != nil {
 		t.Fatalf("old was not disabled: %v", err)
+	}
+	got, ok, err := environment.New(filepath.Join(root, "state.toml")).Load()
+	if err != nil {
+		t.Fatalf("load applied target: %v", err)
+	}
+	if !ok || got != (environment.Target{Kind: environment.KindGroup, Name: "coding"}) {
+		t.Fatalf("applied target = %+v, loaded = %v", got, ok)
 	}
 }
 

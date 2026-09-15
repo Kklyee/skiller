@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/Kklyee/skiller/internal/catalog"
 	"github.com/Kklyee/skiller/internal/doctor"
+	"github.com/Kklyee/skiller/internal/environment"
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/paths"
 	"github.com/Kklyee/skiller/internal/pin"
@@ -68,7 +69,9 @@ type Model struct {
 	selectedProfile string
 	selectedSkill   string
 	selectedSkills  map[string]bool
-	activeGroup     string
+	appliedTarget   environment.Target
+	targetLoaded    bool
+	targetStatus    environment.Status
 	detailExpanded  bool
 
 	search       string
@@ -158,13 +161,19 @@ func (m *Model) refresh() error {
 	if err != nil {
 		return err
 	}
+	appliedTarget, targetLoaded, err := environment.New(m.paths.StatePath()).Load()
+	if err != nil {
+		return err
+	}
 
 	m.skills = skills
 	m.groups = groups
 	m.profiles = profiles
 	m.pins = pinned
 	m.provenance = provenanceData
-	m.activeGroup = findActiveGroup(groups, skills, pinned)
+	m.appliedTarget = appliedTarget
+	m.targetLoaded = targetLoaded
+	m.targetStatus = m.evaluateTarget()
 	m.summary = catalog.Summarize(skills)
 	m.summary.ActiveDir = m.paths.Active
 	m.summary.DisabledDir = m.paths.Disabled
@@ -177,6 +186,87 @@ func (m *Model) refresh() error {
 	m.normalizeSelection()
 
 	return nil
+}
+
+func (m *Model) evaluateTarget() environment.Status {
+	if !m.targetLoaded {
+		return environment.Evaluate(false, false, 0)
+	}
+	plan, err := m.planForTarget(m.appliedTarget)
+	if err != nil {
+		return environment.Evaluate(true, true, 0)
+	}
+	return environment.Evaluate(true, plan.HasIssues(), plan.Changes())
+}
+
+func (m *Model) planForTarget(target environment.Target) (reconcile.Plan, error) {
+	switch target.Kind {
+	case environment.KindGroup:
+		selected, ok := m.groupTarget(target.Name)
+		if !ok {
+			return reconcile.Plan{Group: target.Name, Issues: []string{"group does not exist"}}, nil
+		}
+		return reconcile.BuildWithPins(selected, m.skills, m.pins), nil
+	case environment.KindProfile:
+		stored, ok := m.profileByName(target.Name)
+		if !ok {
+			return reconcile.Plan{Group: target.Name, Issues: []string{"profile does not exist"}}, nil
+		}
+		resolved := profile.Resolve(stored, m.groups)
+		plan := reconcile.BuildWithPins(resolved.Group, m.skills, m.pins)
+		for _, name := range resolved.MissingGroups {
+			plan.Issues = append(plan.Issues, fmt.Sprintf("missing group %s", name))
+		}
+		slices.Sort(plan.Issues)
+		return plan, nil
+	case environment.KindProject:
+		config, err := project.LoadFile(target.Path)
+		if err != nil {
+			return reconcile.Plan{}, err
+		}
+		resolved, missingGroups, err := m.projectTargetForConfig(config)
+		if err != nil {
+			return reconcile.Plan{}, err
+		}
+		plan := reconcile.BuildWithPins(resolved, m.skills, m.pins)
+		for _, name := range missingGroups {
+			plan.Issues = append(plan.Issues, fmt.Sprintf("missing group %s", name))
+		}
+		slices.Sort(plan.Issues)
+		return plan, nil
+	default:
+		return reconcile.Plan{}, fmt.Errorf("unsupported environment target kind %q", target.Kind)
+	}
+}
+
+func (m *Model) groupTarget(name string) (group.Group, bool) {
+	if name == allGroupName {
+		selected := group.Group{Name: allGroupName, Skills: make([]string, 0, len(m.skills))}
+		for _, skill := range m.skills {
+			selected.Skills = append(selected.Skills, skill.ID)
+		}
+		return selected, true
+	}
+	for _, candidate := range m.groups {
+		if candidate.Name == name {
+			return candidate, true
+		}
+	}
+	return group.Group{}, false
+}
+
+func (m *Model) targetMatches(kind environment.Kind, name, path string) bool {
+	if !m.targetLoaded || m.appliedTarget.Kind != kind || m.appliedTarget.Name != name {
+		return false
+	}
+	return kind != environment.KindProject || m.appliedTarget.Path == path
+}
+
+func (m *Model) statusForTarget(kind environment.Kind, name, path string) environment.Status {
+	if !m.targetMatches(kind, name, path) {
+		return environment.StatusManual
+	}
+	return m.targetStatus
 }
 
 func (m *Model) moveSelection(delta int) {
@@ -890,7 +980,10 @@ func (m *Model) projectTarget() (group.Group, []string, error) {
 	if !m.projectLoaded {
 		return group.Group{}, nil, fmt.Errorf("project config is not loaded")
 	}
-	config := m.projectConfig
+	return m.projectTargetForConfig(m.projectConfig)
+}
+
+func (m *Model) projectTargetForConfig(config project.Config) (group.Group, []string, error) {
 	base := group.Group{Name: "project", Skills: config.Skills}
 	missingGroups := []string(nil)
 	if config.Profile != "" {
@@ -929,6 +1022,40 @@ func (m *Model) openProjectReconcile() {
 	slices.Sort(m.plan.Issues)
 	m.planKind = "project"
 	m.modal = modalReconcile
+}
+
+func (m *Model) appliedTargetForPlan() environment.Target {
+	target := environment.Target{
+		Kind: environment.Kind(m.planKind),
+		Name: m.plan.Group,
+	}
+	if target.Kind == environment.KindProject {
+		target.Path = m.projectPath
+	}
+	return target
+}
+
+func (m *Model) saveAppliedTarget() error {
+	target := m.appliedTargetForPlan()
+	if err := environment.New(m.paths.StatePath()).Save(target); err != nil {
+		return err
+	}
+	m.appliedTarget = target
+	m.targetLoaded = true
+	return nil
+}
+
+func (m *Model) clearAppliedTarget(kind environment.Kind, name string) error {
+	if !m.targetMatches(kind, name, "") {
+		return nil
+	}
+	if err := environment.New(m.paths.StatePath()).Clear(); err != nil {
+		return err
+	}
+	m.appliedTarget = environment.Target{}
+	m.targetLoaded = false
+	m.targetStatus = environment.StatusManual
+	return nil
 }
 
 func (m *Model) openEditor() {
@@ -1012,49 +1139,6 @@ func (m *Model) openDeleteGroup() {
 	}
 	m.deleteGroup = m.selectedGroup
 	m.modal = modalDeleteGroup
-}
-
-func findActiveGroup(groups []group.Group, skills []catalog.Skill, pinned []string) string {
-	active := make(map[string]struct{})
-	for _, skill := range skills {
-		switch skill.State {
-		case catalog.StateActive:
-			active[skill.ID] = struct{}{}
-		case catalog.StateConflict, catalog.StateBroken, catalog.StateInvalid:
-			return ""
-		}
-	}
-
-	matches := make([]string, 0, 1)
-	for _, candidate := range groups {
-		if len(candidate.Missing) > 0 {
-			continue
-		}
-		desired := make(map[string]struct{}, len(candidate.Skills)+len(pinned))
-		for _, id := range candidate.Skills {
-			desired[id] = struct{}{}
-		}
-		for _, id := range pinned {
-			desired[id] = struct{}{}
-		}
-		if len(desired) != len(active) {
-			continue
-		}
-		matched := true
-		for id := range desired {
-			if _, ok := active[id]; !ok {
-				matched = false
-				break
-			}
-		}
-		if matched {
-			matches = append(matches, candidate.Name)
-		}
-	}
-	if len(matches) != 1 {
-		return ""
-	}
-	return matches[0]
 }
 
 func (m *Model) setMessage(kind messageKind, message string) {

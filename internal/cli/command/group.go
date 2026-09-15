@@ -6,6 +6,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/Kklyee/skiller/internal/catalog"
+	"github.com/Kklyee/skiller/internal/environment"
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/paths"
 	"github.com/spf13/cobra"
@@ -93,11 +94,18 @@ func newGroupDelete() *cobra.Command {
 		Short: "Delete a group",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			pathSet, err := paths.Default()
+			if err != nil {
+				return err
+			}
 			store, _, err := groupContext()
 			if err != nil {
 				return err
 			}
 			if err := store.Delete(args[0]); err != nil {
+				return err
+			}
+			if err := clearEnvironmentTarget(pathSet, environment.KindGroup, args[0], ""); err != nil {
 				return err
 			}
 			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Deleted group %s\n", args[0])

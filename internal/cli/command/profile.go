@@ -8,6 +8,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/Kklyee/skiller/internal/catalog"
+	"github.com/Kklyee/skiller/internal/environment"
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/paths"
 	"github.com/Kklyee/skiller/internal/profile"
@@ -203,6 +204,9 @@ func newProfileDelete() *cobra.Command {
 			if err := profile.New(pathSet.Profiles).Delete(args[0]); err != nil {
 				return err
 			}
+			if err := clearEnvironmentTarget(pathSet, environment.KindProfile, args[0], ""); err != nil {
+				return err
+			}
 			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Deleted profile %s\n", args[0])
 			return err
 		},
@@ -247,7 +251,7 @@ func newProfileUse() *cobra.Command {
 				return errors.New("cannot apply profile with missing groups, skills, or catalog issues")
 			}
 			if plan.Changes() == 0 {
-				return nil
+				return recordEnvironmentTarget(pathSet, environment.Target{Kind: environment.KindProfile, Name: stored.Name})
 			}
 
 			confirmed, err := confirmPlan(cmd)
@@ -260,6 +264,9 @@ func newProfileUse() *cobra.Command {
 			}
 
 			if err := transaction.Apply(pathSet, plan); err != nil {
+				return err
+			}
+			if err := recordEnvironmentTarget(pathSet, environment.Target{Kind: environment.KindProfile, Name: stored.Name}); err != nil {
 				return err
 			}
 			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Applied profile %s\n", stored.Name)

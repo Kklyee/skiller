@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Kklyee/skiller/internal/environment"
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/pin"
 	"github.com/Kklyee/skiller/internal/profile"
@@ -75,9 +76,19 @@ func TestProfileCommandsAndUse(t *testing.T) {
 	assertProfilePathExists(t, filepath.Join(disabledDir, "old", "SKILL.md"))
 	assertProfilePathExists(t, filepath.Join(activeDir, "wanted", "SKILL.md"))
 	assertProfilePathExists(t, filepath.Join(activeDir, "pinned", "SKILL.md"))
+	gotTarget, ok, err := environment.New(filepath.Join(root, "state.toml")).Load()
+	if err != nil {
+		t.Fatalf("load applied profile: %v", err)
+	}
+	if !ok || gotTarget != (environment.Target{Kind: environment.KindProfile, Name: "go-backend"}) {
+		t.Fatalf("applied profile target = %+v, loaded = %v", gotTarget, ok)
+	}
 
 	if output := executeProfileCommand(t, "delete", "go-backend"); strings.TrimSpace(output) != "Deleted profile go-backend" {
 		t.Fatalf("delete output: %q", output)
+	}
+	if _, ok, err := environment.New(filepath.Join(root, "state.toml")).Load(); err != nil || ok {
+		t.Fatalf("deleted profile target remains: target=%v error=%v", ok, err)
 	}
 }
 

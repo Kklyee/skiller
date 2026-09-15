@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/Kklyee/skiller/internal/catalog"
+	"github.com/Kklyee/skiller/internal/environment"
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/paths"
 	"github.com/Kklyee/skiller/internal/profile"
@@ -55,7 +56,7 @@ func NewSync() *cobra.Command {
 				return errors.New("cannot apply project plan with missing skills, groups, or catalog issues")
 			}
 			if plan.Changes() == 0 {
-				return nil
+				return recordEnvironmentTarget(pathSet, environment.Target{Kind: environment.KindProject, Name: "project", Path: configPath})
 			}
 
 			confirmed, err := confirmPlan(cmd)
@@ -68,6 +69,9 @@ func NewSync() *cobra.Command {
 			}
 
 			if err := transaction.Apply(pathSet, plan); err != nil {
+				return err
+			}
+			if err := recordEnvironmentTarget(pathSet, environment.Target{Kind: environment.KindProject, Name: "project", Path: configPath}); err != nil {
 				return err
 			}
 			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Synced %s\n", configPath)

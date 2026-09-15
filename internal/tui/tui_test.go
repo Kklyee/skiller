@@ -13,11 +13,13 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/Kklyee/skiller/internal/catalog"
 	"github.com/Kklyee/skiller/internal/doctor"
+	"github.com/Kklyee/skiller/internal/environment"
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/paths"
 	"github.com/Kklyee/skiller/internal/pin"
 	"github.com/Kklyee/skiller/internal/profile"
 	skillprovenance "github.com/Kklyee/skiller/internal/provenance"
+	"github.com/Kklyee/skiller/internal/visibility"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -1938,7 +1940,7 @@ func TestFocusedPanelsHaveVisibleBorders(t *testing.T) {
 	}
 }
 
-func TestGroupsShowCurrentlyActiveGroup(t *testing.T) {
+func TestGroupsDoNotInferAppliedGroupFromSkillState(t *testing.T) {
 	root := t.TempDir()
 	activeDir := filepath.Join(root, "active")
 	disabledDir := filepath.Join(root, "disabled")
@@ -1976,26 +1978,74 @@ func TestGroupsShowCurrentlyActiveGroup(t *testing.T) {
 	}
 
 	model.selectedGroup = "other"
-	if !strings.Contains(ansi.Strip(model.viewHeader()), "Group: coding") {
-		t.Fatalf("header should show active group instead of selected group:\n%s", model.viewHeader())
+	header := ansi.Strip(model.viewHeader())
+	if !strings.Contains(header, "Environment: Manual") {
+		t.Fatalf("header should show manual environment without an applied target:\n%s", header)
 	}
 	view := ansi.Strip(model.viewGroupPanel())
-	if !strings.Contains(view, "● coding") {
-		t.Fatalf("active group marker missing:\n%s", view)
+	if strings.Contains(view, "● coding") || strings.Contains(view, "● other") {
+		t.Fatalf("group state was inferred from skill state:\n%s", view)
 	}
-	if strings.Contains(view, "● other") {
-		t.Fatalf("inactive group was marked active:\n%s", view)
-	}
-	header := model.viewHeader()
+	header = model.viewHeader()
 	for _, want := range []string{"Installed", "Active", "Disabled", "Conflict", "Group:"} {
-		if !strings.Contains(header, want) {
+		if want == "Group:" {
+			continue
+		}
+		if !strings.Contains(ansi.Strip(header), want) {
 			t.Fatalf("header missing %q:\n%s", want, header)
 		}
 	}
-	for _, unwanted := range []string{"Broken", "Invalid", "Using:", "● coding"} {
+	for _, unwanted := range []string{"Broken", "Invalid", "Using:", "Group:"} {
 		if strings.Contains(header, unwanted) {
 			t.Fatalf("header contains unwanted %q:\n%s", unwanted, header)
 		}
+	}
+}
+
+func TestAppliedGroupRemainsCurrentWhenSkillsDrift(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	groupsDir := filepath.Join(root, "groups")
+	statePath := filepath.Join(root, "state.toml")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+
+	store := group.New(groupsDir)
+	if _, err := store.Create("coding"); err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	if _, err := store.Add("coding", "alpha"); err != nil {
+		t.Fatalf("add group skill: %v", err)
+	}
+	if err := environment.New(statePath).Save(environment.Target{Kind: environment.KindGroup, Name: "coding"}); err != nil {
+		t.Fatalf("save applied target: %v", err)
+	}
+
+	model, err := NewModel(paths.Set{
+		Active: activeDir, Disabled: disabledDir, Groups: groupsDir, State: statePath,
+		Journal: filepath.Join(root, "transaction.json"), Lock: filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+
+	if got := model.targetStatus; got != environment.StatusSynced {
+		t.Fatalf("initial target status = %s, want %s", got, environment.StatusSynced)
+	}
+	if _, err := visibility.Disable(activeDir, disabledDir, "alpha"); err != nil {
+		t.Fatalf("disable skill: %v", err)
+	}
+	if err := model.refresh(); err != nil {
+		t.Fatalf("refresh after drift: %v", err)
+	}
+	if got := model.targetStatus; got != environment.StatusModified {
+		t.Fatalf("drifted target status = %s, want %s", got, environment.StatusModified)
+	}
+	if got := ansi.Strip(model.viewHeader()); !strings.Contains(got, "Group: coding") {
+		t.Fatalf("header lost applied group after drift:\n%s", got)
+	}
+	if got := ansi.Strip(model.viewGroupPanel()); !strings.Contains(got, "◐ coding") {
+		t.Fatalf("modified group marker missing:\n%s", got)
 	}
 }
 

@@ -5,11 +5,13 @@ import (
 	"charm.land/lipgloss/v2"
 	"fmt"
 	"github.com/Kklyee/skiller/internal/catalog"
+	"github.com/Kklyee/skiller/internal/environment"
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/profile"
 	skillprovenance "github.com/Kklyee/skiller/internal/provenance"
 	"github.com/Kklyee/skiller/internal/reconcile"
 	"github.com/charmbracelet/x/ansi"
+	"path/filepath"
 	"strings"
 )
 
@@ -286,10 +288,8 @@ func (m *Model) viewProfileList() string {
 		if stored.Name == m.selectedProfile {
 			prefix = selectedRowStyle().Render("›") + " "
 		}
-		marker := stateStyle(catalog.StateDisabled).Render("○")
-		if m.profileApplied(stored) {
-			marker = stateStyle(catalog.StateActive).Render("●")
-		}
+		status := m.statusForTarget(environment.KindProfile, stored.Name, "")
+		marker := environmentStatusStyle(status).Render(environmentStatusIcon(status))
 		name := groupNameStyle().Render(stored.Name)
 		if stored.Name == m.selectedProfile {
 			name = groupNameStyle().Bold(true).Render(stored.Name)
@@ -312,10 +312,8 @@ func (m *Model) viewProfileDetails() string {
 		return helpTextStyle().Render("Select a profile to inspect its environment")
 	}
 	target := profile.Resolve(stored, m.groups)
-	status := stateStyle(catalog.StateDisabled).Render("○ Not applied")
-	if m.profileApplied(stored) {
-		status = stateStyle(catalog.StateActive).Render("● Applied")
-	}
+	profileStatus := m.statusForTarget(environment.KindProfile, stored.Name, "")
+	status := environmentStatusStyle(profileStatus).Render(environmentStatusIcon(profileStatus) + " " + environmentStatusLabel(profileStatus))
 	lines := []string{
 		"Name: " + groupNameStyle().Render(stored.Name),
 		"Status: " + status,
@@ -331,15 +329,6 @@ func (m *Model) viewProfileDetails() string {
 		lines = append(lines, messageStyle(messageError).Render("Missing skills: "+strings.Join(missing, ", ")))
 	}
 	return strings.Join(lines, "\n")
-}
-
-func (m *Model) profileApplied(stored profile.Profile) bool {
-	target := profile.Resolve(stored, m.groups)
-	if len(target.MissingGroups) > 0 || len(profile.MissingSkills(target, m.skills)) > 0 {
-		return false
-	}
-	plan := reconcile.BuildWithPins(target.Group, m.skills, m.pins)
-	return !plan.HasIssues() && plan.Changes() == 0
 }
 
 func profileSummary(stored profile.Profile) string {
@@ -426,18 +415,8 @@ func (m *Model) viewProjectDetails() string {
 }
 
 func (m *Model) projectStatus() string {
-	target, missingGroups, err := m.projectTarget()
-	if err != nil || len(missingGroups) > 0 || len(profile.MissingSkills(profile.Target{Group: target}, m.skills)) > 0 {
-		return messageStyle(messageError).Render("Needs attention")
-	}
-	plan := reconcile.BuildWithPins(target, m.skills, m.pins)
-	if plan.HasIssues() {
-		return messageStyle(messageError).Render("Needs attention")
-	}
-	if plan.Changes() == 0 {
-		return stateStyle(catalog.StateActive).Render("● Applied")
-	}
-	return stateStyle(catalog.StateDisabled).Render("○ Not applied")
+	status := m.statusForTarget(environment.KindProject, "project", m.projectPath)
+	return environmentStatusStyle(status).Render(environmentStatusIcon(status) + " " + environmentStatusLabel(status))
 }
 
 func listOrDash(values []string) string {
@@ -453,19 +432,27 @@ func (m *Model) viewHeader() string {
 		headerMetric("Active", m.summary.Active, "10"),
 		headerMetric("Disabled", m.summary.Disabled, "8"),
 		headerMetric("Conflict", m.summary.Conflict, "9"),
-		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Group: " + m.usingGroupName()),
+		m.viewTargetHeader(),
 	}
 	return strings.Join(parts, "  ")
 }
 
-func (m *Model) usingGroupName() string {
-	if m.activeGroup != "" {
-		return m.activeGroup
+func (m *Model) viewTargetHeader() string {
+	if !m.targetLoaded {
+		return environmentStatusStyle(environment.StatusManual).Render("Environment: Manual")
 	}
-	if allSkillsActive(m.skills) {
-		return allGroupName
+	label := "Group"
+	name := m.appliedTarget.Name
+	switch m.appliedTarget.Kind {
+	case environment.KindProfile:
+		label = "Profile"
+	case environment.KindProject:
+		label = "Project"
+		if m.appliedTarget.Path != "" {
+			name = filepath.Base(filepath.Dir(m.appliedTarget.Path))
+		}
 	}
-	return "-"
+	return environmentStatusStyle(m.targetStatus).Render(label + ": " + name)
 }
 
 func (m *Model) viewBrand() string {
@@ -482,14 +469,16 @@ func headerMetric(label string, value int, color string) string {
 
 func (m *Model) viewGroupPanel() string {
 	allMarker := "  "
-	if allSkillsActive(m.skills) {
-		allMarker = stateStyle(catalog.StateActive).Render("●") + " "
+	allStatus := m.statusForTarget(environment.KindGroup, allGroupName, "")
+	if allStatus != environment.StatusManual {
+		allMarker = environmentStatusStyle(allStatus).Render(environmentStatusIcon(allStatus)) + " "
 	}
 	lines := []string{allMarker + groupNameStyle().Render("All") + "  " + fmt.Sprintf("%d", len(m.skills))}
 	for _, group := range m.groups {
 		marker := "  "
-		if group.Name == m.activeGroup {
-			marker = stateStyle(catalog.StateActive).Render("●") + " "
+		status := m.statusForTarget(environment.KindGroup, group.Name, "")
+		if status != environment.StatusManual {
+			marker = environmentStatusStyle(status).Render(environmentStatusIcon(status)) + " "
 		}
 		lines = append(lines, fmt.Sprintf("%s%s  %d", marker, groupNameStyle().Render(group.Name), len(group.Skills)))
 	}
@@ -511,18 +500,6 @@ func (m *Model) viewGroupPanel() string {
 	}
 	start, end := viewportBounds(len(lines), selected, m.mainPanelContentHeight())
 	return strings.Join(lines[start:end], "\n")
-}
-
-func allSkillsActive(skills []catalog.Skill) bool {
-	if len(skills) == 0 {
-		return false
-	}
-	for _, skill := range skills {
-		if skill.State != catalog.StateActive {
-			return false
-		}
-	}
-	return true
 }
 
 func (m *Model) viewSkillsPanel() string {
@@ -773,8 +750,9 @@ func (m *Model) viewGroupManagerList() string {
 			prefix = selectedRowStyle().Render("›") + " "
 		}
 		marker := "  "
-		if group.Name == m.activeGroup {
-			marker = stateStyle(catalog.StateActive).Render("●") + " "
+		status := m.statusForTarget(environment.KindGroup, group.Name, "")
+		if status != environment.StatusManual {
+			marker = environmentStatusStyle(status).Render(environmentStatusIcon(status)) + " "
 		}
 		name := groupNameStyle().Render(group.Name)
 		if group.Name == m.selectedGroup {
@@ -807,10 +785,8 @@ func (m *Model) viewGroupManagerDetails(width int) string {
 		return helpTextStyle().Render("Select a group to inspect its members")
 	}
 
-	status := helpTextStyle().Render("○ Not applied")
-	if group.Name == m.activeGroup {
-		status = stateStyle(catalog.StateActive).Render("● Applied")
-	}
+	groupStatus := m.statusForTarget(environment.KindGroup, group.Name, "")
+	status := environmentStatusStyle(groupStatus).Render(environmentStatusIcon(groupStatus) + " " + environmentStatusLabel(groupStatus))
 	lines := []string{status, "", helpTextStyle().Bold(true).Render("Members")}
 	if len(group.Skills) == 0 {
 		lines = append(lines, helpTextStyle().Render("  No skills"))

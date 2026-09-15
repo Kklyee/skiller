@@ -9,6 +9,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/Kklyee/skiller/internal/catalog"
+	"github.com/Kklyee/skiller/internal/environment"
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/paths"
 	"github.com/Kklyee/skiller/internal/reconcile"
@@ -48,7 +49,7 @@ func NewUse() *cobra.Command {
 				return errors.New("cannot apply plan with missing skills or catalog issues")
 			}
 			if plan.Changes() == 0 {
-				return nil
+				return recordEnvironmentTarget(pathSet, environment.Target{Kind: environment.KindGroup, Name: selected.Name})
 			}
 
 			confirmed, err := confirmPlan(cmd)
@@ -61,6 +62,9 @@ func NewUse() *cobra.Command {
 			}
 
 			if err := transaction.Apply(pathSet, plan); err != nil {
+				return err
+			}
+			if err := recordEnvironmentTarget(pathSet, environment.Target{Kind: environment.KindGroup, Name: selected.Name}); err != nil {
 				return err
 			}
 			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Applied group %s\n", plan.Group)

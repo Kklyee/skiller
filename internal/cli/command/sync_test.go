@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Kklyee/skiller/internal/environment"
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/pin"
 	"github.com/Kklyee/skiller/internal/profile"
@@ -66,6 +67,18 @@ func TestSyncDirectSkills(t *testing.T) {
 	assertProfilePathExists(t, filepath.Join(disabledDir, "old", "SKILL.md"))
 	assertProfilePathExists(t, filepath.Join(activeDir, "wanted", "SKILL.md"))
 	assertProfilePathExists(t, filepath.Join(activeDir, "pinned", "SKILL.md"))
+	gotTarget, ok, err := environment.New(filepath.Join(root, "state.toml")).Load()
+	if err != nil {
+		t.Fatalf("load synced target: %v", err)
+	}
+	configPath, err := filepath.Abs(filepath.Join(projectDir, project.ConfigFileName))
+	if err != nil {
+		t.Fatalf("resolve config path: %v", err)
+	}
+	wantTarget := environment.Target{Kind: environment.KindProject, Name: "project", Path: configPath}
+	if !ok || gotTarget != wantTarget {
+		t.Fatalf("synced target = %+v, loaded = %v, want %+v", gotTarget, ok, wantTarget)
+	}
 }
 
 func TestSyncProfile(t *testing.T) {

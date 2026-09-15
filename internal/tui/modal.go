@@ -5,6 +5,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"fmt"
 	"github.com/Kklyee/skiller/internal/doctor"
+	"github.com/Kklyee/skiller/internal/environment"
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/profile"
 	"github.com/Kklyee/skiller/internal/transaction"
@@ -88,6 +89,8 @@ func (m *Model) updateModal(message bubbletea.KeyPressMsg) bubbletea.Cmd {
 				return nil
 			}
 			if err := transaction.Apply(m.paths, m.plan); err != nil {
+				m.setError(err)
+			} else if err := m.saveAppliedTarget(); err != nil {
 				m.setError(err)
 				return nil
 			} else if err := m.refresh(); err != nil {
@@ -178,6 +181,8 @@ func (m *Model) updateModal(message bubbletea.KeyPressMsg) bubbletea.Cmd {
 		if key == "enter" || strings.EqualFold(key, "y") {
 			if err := profile.New(m.paths.Profiles).Delete(m.deleteProfile); err != nil {
 				m.setError(err)
+			} else if err := m.clearAppliedTarget(environment.KindProfile, m.deleteProfile); err != nil {
+				m.setError(err)
 			} else if err := m.refresh(); err != nil {
 				m.setError(err)
 			} else {
@@ -195,6 +200,8 @@ func (m *Model) updateModal(message bubbletea.KeyPressMsg) bubbletea.Cmd {
 	}
 	if key == "enter" || strings.EqualFold(key, "y") {
 		if err := group.New(m.paths.Groups).Delete(m.deleteGroup); err != nil {
+			m.setError(err)
+		} else if err := m.clearAppliedTarget(environment.KindGroup, m.deleteGroup); err != nil {
 			m.setError(err)
 		} else if err := m.refresh(); err != nil {
 			m.setError(err)

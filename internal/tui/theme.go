@@ -4,6 +4,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/Kklyee/skiller/internal/catalog"
 	"github.com/Kklyee/skiller/internal/doctor"
+	"github.com/Kklyee/skiller/internal/environment"
 )
 
 func messageStyle(kind messageKind) lipgloss.Style {
@@ -100,4 +101,43 @@ func stateIcon(state catalog.State) string {
 		icon = "?"
 	}
 	return icon
+}
+
+func environmentStatusStyle(status environment.Status) lipgloss.Style {
+	color := lipgloss.Color("8")
+	switch status {
+	case environment.StatusSynced:
+		color = lipgloss.Color("10")
+	case environment.StatusModified:
+		color = lipgloss.Color("11")
+	case environment.StatusNeedsAttention:
+		color = lipgloss.Color("9")
+	}
+	return lipgloss.NewStyle().Bold(true).Foreground(color)
+}
+
+func environmentStatusIcon(status environment.Status) string {
+	switch status {
+	case environment.StatusSynced:
+		return "●"
+	case environment.StatusModified:
+		return "◐"
+	case environment.StatusNeedsAttention:
+		return "!"
+	default:
+		return "○"
+	}
+}
+
+func environmentStatusLabel(status environment.Status) string {
+	switch status {
+	case environment.StatusSynced:
+		return "Applied"
+	case environment.StatusModified:
+		return "Modified"
+	case environment.StatusNeedsAttention:
+		return "Needs attention"
+	default:
+		return "Not applied"
+	}
 }

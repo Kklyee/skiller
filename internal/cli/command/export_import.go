@@ -8,6 +8,7 @@ import (
 
 	"github.com/Kklyee/skiller/internal/bundle"
 	"github.com/Kklyee/skiller/internal/catalog"
+	"github.com/Kklyee/skiller/internal/environment"
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/paths"
 	"github.com/Kklyee/skiller/internal/pin"
@@ -135,6 +136,9 @@ func newImportCommand(run installerRunner) *cobra.Command {
 				}
 			}
 			if err := applyBundleMetadata(pathSet, stored, replace); err != nil {
+				return err
+			}
+			if err := environment.New(pathSet.StatePath()).Clear(); err != nil {
 				return err
 			}
 			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Imported skill environment from %s\n", args[0])

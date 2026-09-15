@@ -118,7 +118,8 @@ skiller tui
 ```
 
 主界面按 `Groups / Skills / Details` 展示环境；`p` 打开 Profiles，`o` 打开当前
-Project，`:` 打开命令面板。
+Project，`:` 打开命令面板。顶部的 `Group`、`Profile` 或 `Project` 表示最后一次应用的目标，
+不是当前光标所在的项目。
 
 ```text
 ↑↓ / jk    移动
@@ -129,13 +130,26 @@ x           标记 Skill
 b           批量操作
 /           搜索
 g           Groups
-u           使用当前 Group/Profile/Project
+u           预览并应用当前 Group/Profile/Project
 Enter       进入分组或查看 Details
 ?           帮助
 q           退出
 ```
 
 Details 面板为只读信息；只有 Skills 获得焦点时，`Space`、`a` 等状态操作才生效。
+
+### 环境状态
+
+Skill 的 `active` 和 `disabled` 是电脑上的实际状态。Group、Profile 和 Project 是目标环境：
+
+- `●` 表示目标已应用，实际 Skill 状态与目标一致；
+- `◐` 表示目标仍然是当前目标，但实际状态被手动修改过；
+- `!` 表示目标缺少 Skill、Group 或配置存在问题；
+- `○` 表示该目标当前没有被应用。
+
+手动启用或禁用 Skill 不会悄悄切换当前目标，只会让目标进入 `Modified` 状态。再次使用目标
+即可重新同步。当前目标保存在 `~/.skiller/state.toml`，因此重新打开 TUI 后仍能识别最后使用的
+Group、Profile 或 Project。
 
 ## 数据位置
 
@@ -147,6 +161,7 @@ Details 面板为只读信息；只有 Skills 获得焦点时，`Space`、`a` �
 | Profiles | `~/.skiller/profiles` |
 | Pins | `~/.skiller/pins.toml` |
 | Provenance | `~/.skiller/provenance.toml` |
+| Applied environment | `~/.skiller/state.toml` |
 
 各路径可通过对应的 `SKILLER_*` 环境变量覆盖。
 

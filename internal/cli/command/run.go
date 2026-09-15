@@ -8,6 +8,7 @@ import (
 
 	"github.com/Kklyee/skiller/internal/agent"
 	"github.com/Kklyee/skiller/internal/catalog"
+	"github.com/Kklyee/skiller/internal/environment"
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/paths"
 	"github.com/Kklyee/skiller/internal/reconcile"
@@ -67,9 +68,14 @@ func newRun(runAgent func(string, io.Reader, io.Writer, io.Writer) error) *cobra
 				if err := transaction.Apply(pathSet, plan); err != nil {
 					return err
 				}
+				if err := recordEnvironmentTarget(pathSet, environment.Target{Kind: environment.KindProject, Name: "project", Path: configPath}); err != nil {
+					return err
+				}
 				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Synced %s\n", configPath); err != nil {
 					return err
 				}
+			} else if err := recordEnvironmentTarget(pathSet, environment.Target{Kind: environment.KindProject, Name: "project", Path: configPath}); err != nil {
+				return err
 			}
 
 			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Launching %s\n", args[0]); err != nil {
