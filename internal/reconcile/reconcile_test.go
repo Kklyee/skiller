@@ -26,6 +26,8 @@ func TestBuildPlan(t *testing.T) {
 	assertStrings(t, plan.Enable, "needs-enable")
 	assertStrings(t, plan.Disable, "old")
 	assertStrings(t, plan.Keep, "ignored", "wanted")
+	assertStrings(t, plan.KeepActive, "wanted")
+	assertStrings(t, plan.KeepDisabled, "ignored")
 	assertStrings(t, plan.Missing, "missing")
 	if len(plan.Issues) != 1 || plan.Issues[0] != "keep conflict: conflict" {
 		t.Fatalf("issues: got %v", plan.Issues)
@@ -52,6 +54,8 @@ func TestBuildWithPinsAlwaysIncludesPinnedSkills(t *testing.T) {
 	assertStrings(t, plan.Enable, "pinned")
 	assertStrings(t, plan.Disable, "old")
 	assertStrings(t, plan.Keep, "wanted")
+	assertStrings(t, plan.KeepActive, "wanted")
+	assertStrings(t, plan.KeepDisabled)
 }
 
 func TestBuildWithPinsReportsMissingPinnedSkills(t *testing.T) {

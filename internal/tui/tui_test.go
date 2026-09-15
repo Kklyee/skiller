@@ -1171,6 +1171,7 @@ func TestReconcileModalAppliesGroup(t *testing.T) {
 	groupsDir := filepath.Join(root, "groups")
 	createSkill(t, activeDir, "old", "old", "")
 	createSkill(t, disabledDir, "wanted", "wanted", "")
+	createSkill(t, disabledDir, "ignored", "ignored", "")
 	store := group.New(groupsDir)
 	if _, err := store.Create("coding"); err != nil {
 		t.Fatalf("create group: %v", err)
@@ -1199,6 +1200,11 @@ func TestReconcileModalAppliesGroup(t *testing.T) {
 	}
 	if !strings.Contains(viewText(&model), "Summary") {
 		t.Fatalf("reconcile plan summary missing:\n%s", viewText(&model))
+	}
+	for _, want := range []string{"Keep (1)", "disabled (1)", "────"} {
+		if !strings.Contains(viewText(&model), want) {
+			t.Fatalf("reconcile plan section missing %q:\n%s", want, viewText(&model))
+		}
 	}
 	model.Update(keyCode(bubbletea.KeyEnter))
 	if model.modal != modalNone {
@@ -1760,8 +1766,9 @@ func TestGroupsShowCurrentlyActiveGroup(t *testing.T) {
 	activeDir := filepath.Join(root, "active")
 	disabledDir := filepath.Join(root, "disabled")
 	groupsDir := filepath.Join(root, "groups")
+	pinsPath := filepath.Join(root, "pins.toml")
 	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
-	createSkill(t, disabledDir, "beta", "Beta", "Second skill")
+	createSkill(t, activeDir, "beta", "Beta", "Second skill")
 
 	store := group.New(groupsDir)
 	for _, name := range []string{"coding", "other"} {
@@ -1775,11 +1782,15 @@ func TestGroupsShowCurrentlyActiveGroup(t *testing.T) {
 	if _, err := store.Add("other", "beta"); err != nil {
 		t.Fatalf("add other skill: %v", err)
 	}
+	if _, err := pin.New(pinsPath).Add("beta"); err != nil {
+		t.Fatalf("pin beta: %v", err)
+	}
 
 	model, err := NewModel(paths.Set{
 		Active:   activeDir,
 		Disabled: disabledDir,
 		Groups:   groupsDir,
+		Pins:     pinsPath,
 		Journal:  filepath.Join(root, "transaction.json"),
 		Lock:     filepath.Join(root, "lock"),
 	})

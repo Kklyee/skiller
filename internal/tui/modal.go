@@ -350,31 +350,47 @@ func (m *Model) viewDeleteGroupModal() string {
 }
 
 func (m *Model) viewReconcileModal() string {
-	lines := []string{messageStyle(messageSuccess).Render("Enable")}
+	lines := []string{reconcileSectionStyle(messageSuccess, "Enable", len(m.plan.Enable))}
 	for _, id := range m.plan.Enable {
-		lines = append(lines, messageStyle(messageSuccess).Render("  +")+" "+id)
+		lines = append(lines, messageStyle(messageSuccess).Render("  + "+id))
 	}
-	lines = append(lines, messageStyle(messageError).Render("Disable"))
+	lines = append(lines, m.reconcileDivider(), reconcileSectionStyle(messageError, "Disable", len(m.plan.Disable)))
 	for _, id := range m.plan.Disable {
-		lines = append(lines, messageStyle(messageError).Render("  -")+" "+id)
+		lines = append(lines, messageStyle(messageError).Render("  - "+id))
 	}
-	lines = append(lines, messageStyle(messageInfo).Render("Keep"))
-	for _, id := range m.plan.Keep {
-		lines = append(lines, helpTextStyle().Render("  =")+" "+id)
+	lines = append(lines, m.reconcileDivider(), reconcileSectionStyle(messageInfo, "Keep", len(m.plan.Keep)))
+	if len(m.plan.KeepActive)+len(m.plan.KeepDisabled) == len(m.plan.Keep) {
+		if len(m.plan.KeepActive) > 0 {
+			lines = append(lines, messageStyle(messageSuccess).Render(fmt.Sprintf("  active (%d)", len(m.plan.KeepActive))))
+			for _, id := range m.plan.KeepActive {
+				lines = append(lines, messageStyle(messageSuccess).Render("    = "+id))
+			}
+		}
+		if len(m.plan.KeepDisabled) > 0 {
+			lines = append(lines, helpTextStyle().Render(fmt.Sprintf("  disabled (%d)", len(m.plan.KeepDisabled))))
+			for _, id := range m.plan.KeepDisabled {
+				lines = append(lines, helpTextStyle().Render("    = "+id))
+			}
+		}
+	} else {
+		for _, id := range m.plan.Keep {
+			lines = append(lines, helpTextStyle().Render("  = "+id))
+		}
 	}
 	if len(m.plan.Missing) > 0 {
-		lines = append(lines, messageStyle(messageInfo).Render("Missing"))
+		lines = append(lines, m.reconcileDivider(), reconcileSectionStyle(messageInfo, "Missing", len(m.plan.Missing)))
 		for _, id := range m.plan.Missing {
-			lines = append(lines, messageStyle(messageInfo).Render("  ?")+" "+id)
+			lines = append(lines, messageStyle(messageInfo).Render("  ? "+id))
 		}
 	}
 	if len(m.plan.Issues) > 0 {
-		lines = append(lines, messageStyle(messageError).Render("Issues"))
+		lines = append(lines, m.reconcileDivider(), reconcileSectionStyle(messageError, "Issues", len(m.plan.Issues)))
 		for _, issue := range m.plan.Issues {
-			lines = append(lines, messageStyle(messageError).Render("  !")+" "+issue)
+			lines = append(lines, messageStyle(messageError).Render("  ! "+issue))
 		}
 	}
 	lines = append(lines,
+		m.reconcileDivider(),
 		"",
 		helpTextStyle().Bold(true).Render("Summary"),
 		strings.Join([]string{
@@ -383,6 +399,9 @@ func (m *Model) viewReconcileModal() string {
 			helpTextStyle().Render(fmt.Sprintf("%d unchanged", len(m.plan.Keep))),
 		}, "  "),
 	)
+	if len(m.plan.KeepActive)+len(m.plan.KeepDisabled) == len(m.plan.Keep) {
+		lines = append(lines, helpTextStyle().Render(fmt.Sprintf("(%d active, %d disabled)", len(m.plan.KeepActive), len(m.plan.KeepDisabled))))
+	}
 	if m.plan.HasIssues() {
 		lines = append(lines, "Cannot apply until issues are resolved")
 	}
@@ -395,6 +414,18 @@ func (m *Model) viewReconcileModal() string {
 		m.panel(m.reconcileTitle(), strings.Join(lines, "\n"), m.width, m.height-3, true),
 		renderKeyHints(keyHint{key: "enter", description: "apply"}, keyHint{key: "esc", description: "cancel"}),
 	}, "\n")
+}
+
+func reconcileSectionStyle(kind messageKind, title string, count int) string {
+	return messageStyle(kind).Render(fmt.Sprintf("%s (%d)", title, count))
+}
+
+func (m *Model) reconcileDivider() string {
+	width := m.width - 8
+	if width < 20 {
+		width = 20
+	}
+	return helpTextStyle().Render(strings.Repeat("─", width))
 }
 
 func (m *Model) reconcileTitle() string {

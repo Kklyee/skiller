@@ -38,6 +38,11 @@ func TestUseDryRun(t *testing.T) {
 	if !strings.Contains(output.String(), "  + wanted") || !strings.Contains(output.String(), "  - old") {
 		t.Fatalf("unexpected plan:\n%s", output.String())
 	}
+	for _, want := range []string{"Enable (1)", "Disable (1)", "Keep (0)", "Summary", "1 enable", "1 disable"} {
+		if !strings.Contains(output.String(), want) {
+			t.Fatalf("plan section missing %q:\n%s", want, output.String())
+		}
+	}
 	if _, err := os.Stat(filepath.Join(disabledDir, "wanted")); err != nil {
 		t.Fatalf("dry run changed disabled skill: %v", err)
 	}

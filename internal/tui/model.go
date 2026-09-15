@@ -149,7 +149,7 @@ func (m *Model) refresh() error {
 	m.profiles = profiles
 	m.pins = pinned
 	m.provenance = provenanceData
-	m.activeGroup = findActiveGroup(groups, skills)
+	m.activeGroup = findActiveGroup(groups, skills, pinned)
 	m.summary = catalog.Summarize(skills)
 	m.summary.ActiveDir = m.paths.Active
 	m.summary.DisabledDir = m.paths.Disabled
@@ -784,7 +784,7 @@ func (m *Model) openDeleteGroup() {
 	m.modal = modalDeleteGroup
 }
 
-func findActiveGroup(groups []group.Group, skills []catalog.Skill) string {
+func findActiveGroup(groups []group.Group, skills []catalog.Skill, pinned []string) string {
 	active := make(map[string]struct{})
 	for _, skill := range skills {
 		switch skill.State {
@@ -797,11 +797,21 @@ func findActiveGroup(groups []group.Group, skills []catalog.Skill) string {
 
 	matches := make([]string, 0, 1)
 	for _, candidate := range groups {
-		if len(candidate.Missing) > 0 || len(candidate.Skills) != len(active) {
+		if len(candidate.Missing) > 0 {
+			continue
+		}
+		desired := make(map[string]struct{}, len(candidate.Skills)+len(pinned))
+		for _, id := range candidate.Skills {
+			desired[id] = struct{}{}
+		}
+		for _, id := range pinned {
+			desired[id] = struct{}{}
+		}
+		if len(desired) != len(active) {
 			continue
 		}
 		matched := true
-		for _, id := range candidate.Skills {
+		for id := range desired {
 			if _, ok := active[id]; !ok {
 				matched = false
 				break

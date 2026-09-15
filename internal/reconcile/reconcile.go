@@ -11,12 +11,14 @@ import (
 )
 
 type Plan struct {
-	Group   string
-	Enable  []string
-	Disable []string
-	Keep    []string
-	Missing []string
-	Issues  []string
+	Group        string
+	Enable       []string
+	Disable      []string
+	Keep         []string
+	KeepActive   []string
+	KeepDisabled []string
+	Missing      []string
+	Issues       []string
 }
 
 func Build(selected group.Group, skills []catalog.Skill) Plan {
@@ -42,6 +44,7 @@ func BuildWithPins(selected group.Group, skills []catalog.Skill, pinned []string
 		case catalog.StateActive:
 			if wanted {
 				plan.Keep = append(plan.Keep, skill.ID)
+				plan.KeepActive = append(plan.KeepActive, skill.ID)
 			} else {
 				plan.Disable = append(plan.Disable, skill.ID)
 			}
@@ -50,6 +53,7 @@ func BuildWithPins(selected group.Group, skills []catalog.Skill, pinned []string
 				plan.Enable = append(plan.Enable, skill.ID)
 			} else {
 				plan.Keep = append(plan.Keep, skill.ID)
+				plan.KeepDisabled = append(plan.KeepDisabled, skill.ID)
 			}
 		case catalog.StateConflict, catalog.StateBroken, catalog.StateInvalid:
 			plan.Issues = append(plan.Issues, issueText(skill, wanted))
@@ -72,6 +76,8 @@ func BuildWithPins(selected group.Group, skills []catalog.Skill, pinned []string
 	slices.Sort(plan.Enable)
 	slices.Sort(plan.Disable)
 	slices.Sort(plan.Keep)
+	slices.Sort(plan.KeepActive)
+	slices.Sort(plan.KeepDisabled)
 	slices.Sort(plan.Missing)
 	slices.Sort(plan.Issues)
 

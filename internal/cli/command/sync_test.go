@@ -43,6 +43,11 @@ func TestSyncDirectSkills(t *testing.T) {
 	if !strings.Contains(output.String(), "  + wanted") || !strings.Contains(output.String(), "  + pinned") || !strings.Contains(output.String(), "  - old") {
 		t.Fatalf("dry-run output: %q", output.String())
 	}
+	for _, want := range []string{"Project config:", project.ConfigFileName, "Target: project", "Enable (2)", "Disable (1)", "Keep (0)"} {
+		if !strings.Contains(output.String(), want) {
+			t.Fatalf("dry-run context or section missing %q:\n%s", want, output.String())
+		}
+	}
 	assertProfilePathExists(t, filepath.Join(activeDir, "old", "SKILL.md"))
 	assertProfilePathExists(t, filepath.Join(disabledDir, "wanted", "SKILL.md"))
 
@@ -101,6 +106,9 @@ func TestSyncProfile(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("sync profile dry run: %v\n%s", err, output.String())
 	}
+	if !strings.Contains(output.String(), "Target: go-backend") {
+		t.Fatalf("profile target missing:\n%s", output.String())
+	}
 	if !strings.Contains(output.String(), "  + wanted") || !strings.Contains(output.String(), "  - old") {
 		t.Fatalf("profile dry-run output: %q", output.String())
 	}
@@ -150,6 +158,11 @@ func TestSyncProjectOverridesProfile(t *testing.T) {
 	text := output.String()
 	if !strings.Contains(text, "  + included") || !strings.Contains(text, "  - excluded") || !strings.Contains(text, "  = base") {
 		t.Fatalf("override plan: %q", text)
+	}
+	for _, want := range []string{"active (1)", "disabled (1)"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("keep breakdown missing %q: %q", want, text)
+		}
 	}
 }
 

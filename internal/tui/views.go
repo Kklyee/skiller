@@ -738,7 +738,11 @@ func (m *Model) viewGroupManagerDetails(width int) string {
 	lines = append(lines,
 		"",
 		helpTextStyle().Bold(true).Render("Activation Preview"),
-		fmt.Sprintf("Keep %d   Enable %d   Disable %d", len(plan.Keep), len(plan.Enable), len(plan.Disable)),
+		strings.Join([]string{
+			messageStyle(messageSuccess).Render(fmt.Sprintf("Keep %d", len(plan.Keep))),
+			messageStyle(messageSuccess).Render(fmt.Sprintf("Enable %d", len(plan.Enable))),
+			messageStyle(messageError).Render(fmt.Sprintf("Disable %d", len(plan.Disable))),
+		}, "   "),
 	)
 	if plan.HasIssues() {
 		lines = append(lines, messageStyle(messageError).Render("! Resolve issues before use"))

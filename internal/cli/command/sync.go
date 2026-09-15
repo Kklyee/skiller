@@ -33,6 +33,9 @@ func NewSync() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if _, err := fmt.Fprintln(cmd.OutOrStdout(), planContextStyle().Render("Project config: "+configPath)); err != nil {
+				return fmt.Errorf("write project config: %w", err)
+			}
 			if err := writePlan(cmd, plan); err != nil {
 				return err
 			}
