@@ -75,6 +75,10 @@ func (m *Model) updateKey(message bubbletea.KeyPressMsg) bubbletea.Cmd {
 	}
 
 	key := message.String()
+	if key == ":" {
+		m.openCommandPalette()
+		return nil
+	}
 	switch m.screen {
 	case ScreenGroups:
 		return m.updateGroups(message, key)

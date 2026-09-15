@@ -73,6 +73,9 @@ type Model struct {
 	search       string
 	searchActive bool
 
+	paletteQuery string
+	paletteIndex int
+
 	modal       modal
 	plan        reconcile.Plan
 	planKind    string

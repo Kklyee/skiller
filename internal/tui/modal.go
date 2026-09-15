@@ -4,6 +4,7 @@ import (
 	bubbletea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"fmt"
+	"github.com/Kklyee/skiller/internal/doctor"
 	"github.com/Kklyee/skiller/internal/group"
 	"github.com/Kklyee/skiller/internal/transaction"
 	"strings"
@@ -18,7 +19,14 @@ const (
 	modalGroupName
 	modalBatch
 	modalBatchGroup
+	modalPalette
 )
+
+type paletteCommand struct {
+	id          string
+	title       string
+	description string
+}
 
 type batchAction uint8
 
@@ -30,6 +38,9 @@ const (
 
 func (m *Model) updateModal(message bubbletea.KeyPressMsg) bubbletea.Cmd {
 	key := message.String()
+	if m.modal == modalPalette {
+		return m.updatePalette(message, key)
+	}
 	if m.modal == modalBatch {
 		switch key {
 		case "esc":
@@ -137,6 +148,118 @@ func (m *Model) updateModal(message bubbletea.KeyPressMsg) bubbletea.Cmd {
 		m.modal = modalNone
 	}
 	return nil
+}
+
+func (m *Model) updatePalette(message bubbletea.KeyPressMsg, key string) bubbletea.Cmd {
+	switch key {
+	case "esc":
+		m.closePalette()
+	case "up", "k":
+		m.movePalette(-1)
+	case "down", "j":
+		m.movePalette(1)
+	case "backspace", "delete":
+		runes := []rune(m.paletteQuery)
+		if len(runes) > 0 {
+			m.paletteQuery = string(runes[:len(runes)-1])
+			m.paletteIndex = 0
+		}
+	case "enter":
+		m.executePaletteCommand()
+	default:
+		if message.Text != "" {
+			m.paletteQuery += message.Text
+			m.paletteIndex = 0
+		}
+	}
+	return nil
+}
+
+func (m *Model) openCommandPalette() {
+	m.modal = modalPalette
+	m.paletteQuery = ""
+	m.paletteIndex = 0
+}
+
+func (m *Model) closePalette() {
+	m.modal = modalNone
+	m.paletteQuery = ""
+	m.paletteIndex = 0
+}
+
+func (m *Model) paletteCommands() []paletteCommand {
+	return []paletteCommand{
+		{id: "groups", title: "Groups", description: "open group management"},
+		{id: "profiles", title: "Profiles", description: "open profile environments"},
+		{id: "project", title: "Project", description: "open project environment"},
+		{id: "use", title: "Use selected group", description: "preview the current group"},
+		{id: "doctor", title: "Doctor", description: "inspect environment health"},
+		{id: "help", title: "Help", description: "show keyboard help"},
+		{id: "search", title: "Search skills", description: "filter the skill list"},
+		{id: "toggle-all", title: "Toggle all visible skills", description: "activate or disable visible skills"},
+	}
+}
+
+func (m *Model) filteredPaletteCommands() []paletteCommand {
+	query := strings.ToLower(strings.TrimSpace(m.paletteQuery))
+	commands := m.paletteCommands()
+	if query == "" {
+		return commands
+	}
+	filtered := make([]paletteCommand, 0, len(commands))
+	for _, command := range commands {
+		if strings.Contains(strings.ToLower(command.title), query) || strings.Contains(strings.ToLower(command.description), query) {
+			filtered = append(filtered, command)
+		}
+	}
+	return filtered
+}
+
+func (m *Model) movePalette(delta int) {
+	commands := m.filteredPaletteCommands()
+	if len(commands) == 0 {
+		m.paletteIndex = 0
+		return
+	}
+	m.paletteIndex += delta
+	if m.paletteIndex < 0 {
+		m.paletteIndex = len(commands) - 1
+	}
+	if m.paletteIndex >= len(commands) {
+		m.paletteIndex = 0
+	}
+}
+
+func (m *Model) executePaletteCommand() {
+	commands := m.filteredPaletteCommands()
+	if len(commands) == 0 {
+		return
+	}
+	if m.paletteIndex >= len(commands) {
+		m.paletteIndex = len(commands) - 1
+	}
+	command := commands[m.paletteIndex]
+	m.closePalette()
+	switch command.id {
+	case "groups":
+		m.openGroups()
+	case "profiles":
+		m.openProfiles()
+	case "project":
+		m.openProject()
+	case "use":
+		m.openReconcile()
+	case "doctor":
+		m.doctorReport = doctor.Inspect(m.paths)
+		m.screen = ScreenDoctor
+	case "help":
+		m.screen = ScreenHelp
+	case "search":
+		m.searchActive = true
+		m.search = ""
+	case "toggle-all":
+		m.toggleAllSkills()
+	}
 }
 
 func (m *Model) viewBatchModal() string {

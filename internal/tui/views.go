@@ -40,6 +40,9 @@ func (m *Model) viewContent() string {
 	if m.modal == modalBatchGroup {
 		return m.viewBatchGroupModal()
 	}
+	if m.modal == modalPalette {
+		return m.viewCommandPalette()
+	}
 
 	switch m.screen {
 	case ScreenGroups:
@@ -140,6 +143,45 @@ func (m *Model) viewProfiles() string {
 		),
 		footer,
 	}, "\n")
+}
+
+func (m *Model) viewCommandPalette() string {
+	commands := m.filteredPaletteCommands()
+	lines := []string{selectedRowStyle().Render(":" + m.paletteQuery + "▌"), ""}
+	for index, command := range commands {
+		prefix := "  "
+		if index == m.paletteIndex {
+			prefix = selectedRowStyle().Render("›") + " "
+		}
+		lines = append(lines, prefix+helpKeyStyle().Render(command.title)+"  "+helpTextStyle().Render(command.description))
+	}
+	if len(commands) == 0 {
+		lines = append(lines, helpTextStyle().Render("No matching commands"))
+	}
+	width := m.width - 8
+	if width < 42 {
+		width = 42
+	}
+	if width > 84 {
+		width = 84
+	}
+	if width > m.width {
+		width = m.width
+	}
+	height := len(lines) + 2
+	if height > m.height-3 {
+		height = m.height - 3
+	}
+	if height < 3 {
+		height = 3
+	}
+	panel := m.panel("Command Palette", strings.Join(lines, "\n"), width, height, true)
+	footer := renderKeyHints(
+		keyHint{key: "↑↓/jk", description: "move"},
+		keyHint{key: "enter", description: "run"},
+		keyHint{key: "esc", description: "close"},
+	)
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, strings.Join([]string{panel, footer}, "\n"))
 }
 
 func (m *Model) viewProfileList() string {
@@ -519,6 +561,7 @@ func (m *Model) viewFooter() string {
 		keyHint{key: "g", description: "groups"},
 		keyHint{key: "p", description: "profiles"},
 		keyHint{key: "o", description: "project"},
+		keyHint{key: ":", description: "commands"},
 		keyHint{key: "u", description: "use"},
 	)
 	if m.focus == FocusGroups {
@@ -770,6 +813,7 @@ func (m *Model) viewHelp() string {
 		helpLine("g", "group management"),
 		helpLine("p", "profile environments"),
 		helpLine("o", "project environment"),
+		helpLine(":", "command palette"),
 		helpLine("u", "preview and apply selected group"),
 		helpLine("enter", "expand details"),
 		helpLine("d", "doctor/status"),

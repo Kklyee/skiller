@@ -239,6 +239,32 @@ func TestSkillsPanelShowsMultiSelectToolbar(t *testing.T) {
 	}
 }
 
+func TestCommandPaletteFiltersAndExecutesNavigation(t *testing.T) {
+	root := t.TempDir()
+	model, err := NewModel(paths.Set{
+		Active: filepath.Join(root, "active"), Disabled: filepath.Join(root, "disabled"), Groups: filepath.Join(root, "groups"),
+		Journal: filepath.Join(root, "transaction.json"), Lock: filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(keyText(":"))
+	if model.modal != modalPalette {
+		t.Fatalf("palette modal = %v, want palette", model.modal)
+	}
+	if view := viewText(&model); !strings.Contains(view, "Command Palette") || !strings.Contains(view, "Profiles") {
+		t.Fatalf("palette view missing commands:\n%s", view)
+	}
+	model.Update(keyText("profile"))
+	if view := viewText(&model); !strings.Contains(view, "Profiles") || strings.Contains(view, "Project") {
+		t.Fatalf("palette filter did not narrow commands:\n%s", view)
+	}
+	model.Update(keyCode(bubbletea.KeyEnter))
+	if model.modal != modalNone || model.screen != ScreenProfiles {
+		t.Fatalf("palette navigation result: modal=%v screen=%v", model.modal, model.screen)
+	}
+}
+
 func TestDetailsPanelShowsSkillProvenance(t *testing.T) {
 	root := t.TempDir()
 	activeDir := filepath.Join(root, "active")
