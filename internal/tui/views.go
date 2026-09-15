@@ -389,6 +389,10 @@ func (m *Model) viewSkillsPanel() string {
 	visible := m.visibleSkills()
 	lines := make([]string, 0, len(visible)+1)
 	contentHeight := m.mainPanelContentHeight()
+	if toolbar := m.viewSelectionToolbar(); toolbar != "" {
+		lines = append(lines, toolbar)
+		contentHeight--
+	}
 	if m.searchActive {
 		lines = append(lines, m.viewSearchBar(len(visible)))
 		contentHeight--
@@ -413,6 +417,14 @@ func (m *Model) viewSkillsPanel() string {
 		lines = append(lines, row)
 	}
 	return strings.Join(lines, "\n")
+}
+
+func (m *Model) viewSelectionToolbar() string {
+	if m.selectedSkillCount() == 0 {
+		return ""
+	}
+	return selectionStyle().Render(fmt.Sprintf("✓ %d selected", m.selectedSkillCount())) + "  " +
+		renderKeyHints(keyHint{key: "b", description: "batch"}, keyHint{key: "c", description: "clear"})
 }
 
 func (m *Model) viewSearchBar(matches int) string {

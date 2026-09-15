@@ -215,6 +215,30 @@ func TestSkillRowsShowProvenanceUpdateBadge(t *testing.T) {
 	}
 }
 
+func TestSkillsPanelShowsMultiSelectToolbar(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+	createSkill(t, activeDir, "beta", "Beta", "Second skill")
+	model, err := NewModel(paths.Set{
+		Active: activeDir, Disabled: filepath.Join(root, "disabled"), Groups: filepath.Join(root, "groups"),
+		Journal: filepath.Join(root, "transaction.json"), Lock: filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(keyCode(bubbletea.KeyTab))
+	model.Update(keyText("x"))
+	model.Update(keyCode(bubbletea.KeyDown))
+	model.Update(keyText("x"))
+	toolbar := ansi.Strip(model.viewSkillsPanel())
+	for _, want := range []string{"2 selected", "b batch", "c clear"} {
+		if !strings.Contains(toolbar, want) {
+			t.Fatalf("skills toolbar missing %q:\n%s", want, toolbar)
+		}
+	}
+}
+
 func TestDetailsPanelShowsSkillProvenance(t *testing.T) {
 	root := t.TempDir()
 	activeDir := filepath.Join(root, "active")
