@@ -23,7 +23,7 @@ Skiller 把环境选择保存为可重复的配置，让切换和恢复更简单
 
 ## 安装
 
-需要 Go 1.27 或更高版本：
+从源码安装需要 Go 1.27 或更高版本：
 
 ```bash
 go install github.com/Kklyee/skiller/cmd/skiller@latest
@@ -36,6 +36,33 @@ git clone https://github.com/Kklyee/skiller.git
 cd skiller
 go build -o skiller ./cmd/skiller
 ```
+
+如果电脑上没有 Go，也可以通过 npm 安装预编译版本。npm 包会根据当前系统和 CPU 架构下载对应的 Skiller，支持 Linux、macOS 和 Windows 的 x64、arm64：
+
+```bash
+npm install --global skiller-cli
+skiller --version
+skiller tui
+```
+
+升级和卸载：
+
+```bash
+npm update --global skiller-cli
+npm uninstall --global skiller-cli
+```
+
+npm 安装只需要 Node.js 和 npm，不会替电脑安装 Go。npm 包只是 Skiller 的分发方式，Group、Profile、Pin
+和 Skill 数据仍然按照 Skiller 的默认目录保存。
+
+维护者发布新版本时，给仓库配置 `NPM_TOKEN` Secret，然后推送版本标签：
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Release 工作流会构建 GitHub Release、生成六个平台归档，并自动发布对应版本的 `skiller-cli`。
 
 ## 快速开始
 

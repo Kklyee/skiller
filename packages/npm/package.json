@@ -1,0 +1,44 @@
+{
+  "name": "skiller-cli",
+  "version": "0.1.0",
+  "description": "Cross-platform npm distribution for Skiller, a local Skill environment controller.",
+  "bin": {
+    "skiller": "cli/skiller.js"
+  },
+  "files": [
+    "cli/skiller.js",
+    "lib/install.js",
+    "README.md"
+  ],
+  "scripts": {
+    "postinstall": "node lib/install.js",
+    "prepublishOnly": "node --check cli/skiller.js && node --check lib/install.js"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "os": [
+    "linux",
+    "darwin",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Kklyee/skiller.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Kklyee/skiller/issues"
+  },
+  "homepage": "https://github.com/Kklyee/skiller",
+  "keywords": [
+    "ai",
+    "agent",
+    "cli",
+    "skills",
+    "tui"
+  ]
+}

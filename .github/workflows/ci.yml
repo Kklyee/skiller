@@ -35,3 +35,21 @@ jobs:
 
       - name: go test
         run: go test ./...
+
+  npm-package:
+    name: Validate npm package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Check npm package
+        working-directory: packages/npm
+        run: |
+          npm run prepublishOnly
+          npm pack --dry-run

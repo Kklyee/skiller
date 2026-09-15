@@ -31,3 +31,70 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  npm-assets:
+    name: Build npm release archives
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build and upload npm archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          commit_date="$(git show -s --format=%cI "$GITHUB_SHA")"
+          output_dir="$RUNNER_TEMP/skiller-npm"
+          ldflags="-s -w -X github.com/Kklyee/skiller/internal/version.Version=${version} -X github.com/Kklyee/skiller/internal/version.Commit=${GITHUB_SHA} -X github.com/Kklyee/skiller/internal/version.Date=${commit_date}"
+          mkdir -p "$output_dir"
+
+          for target in "linux amd64" "linux arm64" "darwin amd64" "darwin arm64" "windows amd64" "windows arm64"; do
+            read -r goos goarch <<< "$target"
+            target_dir="$output_dir/${goos}_${goarch}"
+            binary_name="skiller"
+            mkdir -p "$target_dir"
+            if [[ "$goos" == "windows" ]]; then
+              binary_name="skiller.exe"
+            fi
+            GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=0 go build -trimpath -ldflags "$ldflags" -o "$target_dir/$binary_name" ./cmd/skiller
+            tar -czf "$output_dir/skiller-npm_${version}_${goos}_${goarch}.tar.gz" -C "$target_dir" "$binary_name"
+          done
+
+          gh release upload "$GITHUB_REF_NAME" "$output_dir"/*.tar.gz --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  npm:
+    name: Publish npm package
+    needs: npm-assets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Set package version from release tag
+        working-directory: packages/npm
+        shell: bash
+        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
+
+      - name: Publish npm package
+        working-directory: packages/npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
