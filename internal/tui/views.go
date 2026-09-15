@@ -453,11 +453,7 @@ func (m *Model) viewSkillsPanel() string {
 	}
 	start, end := viewportBounds(len(visible), selected, contentHeight)
 	for _, skill := range visible[start:end] {
-		row := skillRowWithSelection(skill, skill.ID == m.selectedSkill, m.isPinned(skill.ID), m.selectedSkills[skill.ID])
-		if origin, ok := m.provenance[skill.ID]; ok && (origin.Repository != "" || origin.Installer != "") {
-			row += " " + updateBadgeStyle().Render("↻")
-		}
-		lines = append(lines, row)
+		lines = append(lines, skillRowWithSelection(skill, skill.ID == m.selectedSkill, m.isPinned(skill.ID), m.selectedSkills[skill.ID]))
 	}
 	return strings.Join(lines, "\n")
 }

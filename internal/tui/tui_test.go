@@ -188,7 +188,7 @@ func TestProjectPageShowsConfigAndOpensPreview(t *testing.T) {
 	}
 }
 
-func TestSkillRowsShowProvenanceUpdateBadge(t *testing.T) {
+func TestSkillRowsKeepProvenanceInDetails(t *testing.T) {
 	root := t.TempDir()
 	activeDir := filepath.Join(root, "active")
 	provenancePath := filepath.Join(root, "provenance.toml")
@@ -207,8 +207,8 @@ func TestSkillRowsShowProvenanceUpdateBadge(t *testing.T) {
 		t.Fatalf("new model: %v", err)
 	}
 	view := viewText(&model)
-	if !strings.Contains(view, "↻") {
-		t.Fatalf("provenance badge missing from skill row:\n%s", view)
+	if strings.Contains(view, "↻") {
+		t.Fatalf("provenance badge should not be shown in skill row:\n%s", view)
 	}
 	if !strings.Contains(view, "Update source: skills") {
 		t.Fatalf("update source missing from details:\n%s", view)
