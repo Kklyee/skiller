@@ -23,7 +23,7 @@ Skiller 把环境选择保存为可重复的配置，让切换和恢复更简单
 
 ## 安装
 
-从源码安装需要 Go 1.27 或更高版本：
+需要 Go 1.27 或更高版本：
 
 ```bash
 go install github.com/Kklyee/skiller/cmd/skiller@latest
@@ -36,42 +36,6 @@ git clone https://github.com/Kklyee/skiller.git
 cd skiller
 go build -o skiller ./cmd/skiller
 ```
-
-如果电脑上没有 Go，也可以通过 npm 安装预编译版本。npm 包会根据当前系统和 CPU 架构下载对应的 Skiller，支持 Linux、macOS 和 Windows 的 x64、arm64。
-
-不需要 npm 账号时，可以直接从 GitHub Release 安装 npm 包：
-
-```bash
-npm install --global https://github.com/Kklyee/skiller/releases/download/v0.1.0/skiller-cli-0.1.0.tgz
-skiller --version
-skiller tui
-```
-
-如果 npm 包已经发布到官方仓库，也可以使用更短的命令：
-
-```bash
-npm install --global skiller-cli
-```
-
-升级和卸载：
-
-```bash
-npm update --global skiller-cli
-npm uninstall --global skiller-cli
-```
-
-npm 安装只需要 Node.js 和 npm，不会替电脑安装 Go。npm 包只是 Skiller 的分发方式，Group、Profile、Pin
-和 Skill 数据仍然按照 Skiller 的默认目录保存。
-
-维护者发布新版本时，只需要推送版本标签，GitHub Release 会自动生成二进制和 npm 安装包：
-
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-如果之后可以正常使用 npm 注册，再在仓库中配置 `NPM_TOKEN` Secret 和 `NPM_PUBLISH=true`
-Repository Variable，Release 工作流就会额外把 `skiller-cli` 发布到 npm 官方仓库。
 
 ## 快速开始
 
@@ -170,25 +134,3 @@ Skill 的 `active` 和 `disabled` 是电脑上的实际状态。Group 和 Profil
 手动启用或禁用 Skill 不会悄悄切换当前目标，只会让目标进入 `Modified` 状态。再次使用目标
 即可重新同步。当前目标保存在 `~/.skiller/state.toml`，因此重新打开 TUI 后仍能识别最后使用的
 Group 或 Profile。
-
-## 数据位置
-
-| 数据 | 默认位置 |
-| --- | --- |
-| Active Skills | `~/.agents/skills` |
-| Disabled Skills | `~/.skiller/disabled` |
-| Groups | `~/.skiller/groups` |
-| Profiles | `~/.skiller/profiles` |
-| Pins | `~/.skiller/pins.toml` |
-| Provenance | `~/.skiller/provenance.toml` |
-| Applied environment | `~/.skiller/state.toml` |
-
-各路径可通过对应的 `SKILLER_*` 环境变量覆盖。
-
-## 开发检查
-
-```bash
-go fmt ./...
-go vet ./...
-go test ./...
-```
