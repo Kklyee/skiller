@@ -448,18 +448,24 @@ func listOrDash(values []string) string {
 }
 
 func (m *Model) viewHeader() string {
-	groupName := "All"
-	if m.selectedGroup != "" {
-		groupName = m.selectedGroup
-	}
 	parts := []string{
 		headerMetric("Installed", m.summary.Installed, "6"),
 		headerMetric("Active", m.summary.Active, "10"),
 		headerMetric("Disabled", m.summary.Disabled, "8"),
 		headerMetric("Conflict", m.summary.Conflict, "9"),
-		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Group: " + groupName),
+		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Group: " + m.usingGroupName()),
 	}
 	return strings.Join(parts, "  ")
+}
+
+func (m *Model) usingGroupName() string {
+	if m.activeGroup != "" {
+		return m.activeGroup
+	}
+	if allSkillsActive(m.skills) {
+		return allGroupName
+	}
+	return "-"
 }
 
 func (m *Model) viewBrand() string {

@@ -1975,6 +1975,10 @@ func TestGroupsShowCurrentlyActiveGroup(t *testing.T) {
 		t.Fatalf("new model: %v", err)
 	}
 
+	model.selectedGroup = "other"
+	if !strings.Contains(ansi.Strip(model.viewHeader()), "Group: coding") {
+		t.Fatalf("header should show active group instead of selected group:\n%s", model.viewHeader())
+	}
 	view := ansi.Strip(model.viewGroupPanel())
 	if !strings.Contains(view, "● coding") {
 		t.Fatalf("active group marker missing:\n%s", view)
