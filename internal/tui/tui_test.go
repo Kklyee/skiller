@@ -1040,6 +1040,105 @@ func TestGroupsPageSelectsFirstGroupAndKeepsSelectionAtTop(t *testing.T) {
 	}
 }
 
+func TestGroupsPageKeepsPanelsAlignedWhenDetailsWrap(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	groupsDir := filepath.Join(root, "groups")
+	store := group.New(groupsDir)
+	if _, err := store.Create("coding"); err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	for index := 0; index < 14; index++ {
+		id := fmt.Sprintf("member-%02d-with-a-long-name", index)
+		createSkill(t, activeDir, id, id, "Description")
+		if _, err := store.Add("coding", id); err != nil {
+			t.Fatalf("add %s to group: %v", id, err)
+		}
+	}
+
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: disabledDir,
+		Groups:   groupsDir,
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(bubbletea.WindowSizeMsg{Width: 100, Height: 14})
+	model.Update(keyText("g"))
+
+	view := viewText(&model)
+	for _, line := range strings.Split(view, "\n") {
+		if strings.Count(line, "╰")+strings.Count(line, "└") == 2 {
+			return
+		}
+	}
+	t.Fatalf("groups page panel bottom borders do not share one row:\n%s", view)
+}
+
+func TestGroupsPageFlowsMembersIntoResponsiveColumns(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	groupsDir := filepath.Join(root, "groups")
+	store := group.New(groupsDir)
+	if _, err := store.Create("coding"); err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	memberIDs := make([]string, 0, 8)
+	for index := 0; index < 8; index++ {
+		id := fmt.Sprintf("member-%02d", index)
+		memberIDs = append(memberIDs, id)
+		createSkill(t, activeDir, id, id, "Description")
+		if _, err := store.Add("coding", id); err != nil {
+			t.Fatalf("add %s to group: %v", id, err)
+		}
+	}
+
+	model, err := NewModel(paths.Set{
+		Active:   activeDir,
+		Disabled: disabledDir,
+		Groups:   groupsDir,
+		Journal:  filepath.Join(root, "transaction.json"),
+		Lock:     filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+
+	model.Update(bubbletea.WindowSizeMsg{Width: 120, Height: 24})
+	model.Update(keyText("g"))
+	wideColumns := maxMemberColumns(viewText(&model), memberIDs)
+
+	model.Update(bubbletea.WindowSizeMsg{Width: 70, Height: 24})
+	narrowColumns := maxMemberColumns(viewText(&model), memberIDs)
+	if wideColumns < 2 {
+		t.Fatalf("wide groups page did not flow members into columns:\n%s", viewText(&model))
+	}
+	if wideColumns <= narrowColumns {
+		t.Fatalf("member grid did not respond to width: wide=%d narrow=%d\n%s", wideColumns, narrowColumns, viewText(&model))
+	}
+}
+
+func maxMemberColumns(view string, memberIDs []string) int {
+	maxColumns := 0
+	for _, line := range strings.Split(view, "\n") {
+		columns := 0
+		for _, id := range memberIDs {
+			if strings.Contains(line, id) {
+				columns++
+			}
+		}
+		if columns > maxColumns {
+			maxColumns = columns
+		}
+	}
+	return maxColumns
+}
+
 func TestConflictFromExternalInstallerIsVisible(t *testing.T) {
 	root := t.TempDir()
 	activeDir := filepath.Join(root, "active")

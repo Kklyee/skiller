@@ -9,6 +9,7 @@ import (
 	"github.com/Kklyee/skiller/internal/profile"
 	skillprovenance "github.com/Kklyee/skiller/internal/provenance"
 	"github.com/Kklyee/skiller/internal/reconcile"
+	"github.com/charmbracelet/x/ansi"
 	"strings"
 )
 
@@ -168,7 +169,7 @@ func (m *Model) viewCommandPalette() string {
 	if width > m.width {
 		width = m.width
 	}
-	height := len(lines) + 2
+	height := len(lines) + 3
 	if height > m.height-3 {
 		height = m.height - 3
 	}
@@ -632,7 +633,6 @@ func (m *Model) viewFooter() string {
 
 func (m *Model) viewGroups() string {
 	body := m.viewGroupManagerList()
-	details := m.viewGroupManagerDetails()
 	leftWidth := m.width / 4
 	if leftWidth < 28 {
 		leftWidth = 28
@@ -647,10 +647,6 @@ func (m *Model) viewGroups() string {
 		leftWidth = 4
 	}
 	rightWidth := m.width - leftWidth
-	panelHeight := m.height - 3
-	if panelHeight < 3 {
-		panelHeight = 3
-	}
 	footer := renderKeyHints(
 		keyHint{key: "↑↓/jk", description: "move"},
 		keyHint{key: "n", description: "new"},
@@ -660,12 +656,17 @@ func (m *Model) viewGroups() string {
 		keyHint{key: "enter", description: "inspect"},
 		keyHint{key: "esc", description: "back"},
 	)
+	title := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Groups")
+	panelHeight := m.height - lipgloss.Height(title) - lipgloss.Height(footer) - 2
+	if panelHeight < 3 {
+		panelHeight = 3
+	}
 	return strings.Join([]string{
-		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Groups"),
+		title,
 		lipgloss.JoinHorizontal(
 			lipgloss.Top,
 			m.panel("Groups", body, leftWidth, panelHeight, true),
-			m.panel(m.groupManagerTitle(), details, rightWidth, panelHeight, false),
+			m.panel(m.groupManagerTitle(), m.viewGroupManagerDetails(rightWidth-4), rightWidth, panelHeight, false),
 		),
 		footer,
 	}, "\n")
@@ -707,7 +708,7 @@ func (m *Model) groupManagerTitle() string {
 	return "Details"
 }
 
-func (m *Model) viewGroupManagerDetails() string {
+func (m *Model) viewGroupManagerDetails(width int) string {
 	group, ok := m.selectedGroupValue()
 	if !ok {
 		return helpTextStyle().Render("Select a group to inspect its members")
@@ -725,14 +726,16 @@ func (m *Model) viewGroupManagerDetails() string {
 		for _, skill := range m.skills {
 			installed[skill.ID] = skill
 		}
+		members := make([]string, 0, len(group.Skills))
 		for _, id := range group.Skills {
 			skill, ok := installed[id]
 			if !ok {
-				lines = append(lines, messageStyle(messageInfo).Render("? ")+id+" (missing)")
+				members = append(members, messageStyle(messageInfo).Render("? ")+id+" (missing)")
 				continue
 			}
-			lines = append(lines, stateStyle(skill.State).Render(stateIcon(skill.State))+" "+displayName(skill))
+			members = append(members, stateStyle(skill.State).Render(stateIcon(skill.State))+" "+displayName(skill))
 		}
+		lines = append(lines, responsiveGrid(members, width)...)
 	}
 
 	plan := reconcile.BuildWithPins(group, m.skills, m.pins)
@@ -745,6 +748,51 @@ func (m *Model) viewGroupManagerDetails() string {
 		lines = append(lines, messageStyle(messageError).Render("! Resolve issues before use"))
 	}
 	return strings.Join(lines, "\n")
+}
+
+func responsiveGrid(items []string, width int) []string {
+	if len(items) == 0 {
+		return nil
+	}
+	if width < 1 {
+		width = 1
+	}
+
+	maxItemWidth := 1
+	for _, item := range items {
+		if itemWidth := ansi.StringWidth(item); itemWidth > maxItemWidth {
+			maxItemWidth = itemWidth
+		}
+	}
+	cellWidth := maxItemWidth + 2
+	columns := width / cellWidth
+	if columns < 1 {
+		columns = 1
+	}
+	if columns > len(items) {
+		columns = len(items)
+	}
+	if columns == 1 {
+		return items
+	}
+
+	rows := make([]string, 0, (len(items)+columns-1)/columns)
+	for start := 0; start < len(items); start += columns {
+		end := start + columns
+		if end > len(items) {
+			end = len(items)
+		}
+		cells := make([]string, 0, end-start)
+		for index, item := range items[start:end] {
+			if index == end-start-1 {
+				cells = append(cells, item)
+				continue
+			}
+			cells = append(cells, lipgloss.NewStyle().Width(cellWidth).Render(item))
+		}
+		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Top, cells...))
+	}
+	return rows
 }
 
 func (m *Model) selectedGroupValue() (group.Group, bool) {

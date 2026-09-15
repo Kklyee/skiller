@@ -132,11 +132,17 @@ func (m *Model) panel(title, content string, width, height int, focused bool) st
 	if height < 3 {
 		height = 3
 	}
-	style := lipgloss.NewStyle().Width(width-2).Height(height-2).MaxHeight(height).Padding(0, 1)
+	inner := lipgloss.NewStyle().
+		Width(width-2).
+		Height(height-2).
+		MaxHeight(height-2).
+		Padding(0, 1).
+		Render(lipgloss.NewStyle().Bold(true).Render(title) + "\n" + content)
+	style := lipgloss.NewStyle()
 	if focused {
 		style = style.Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("6"))
 	} else {
 		style = style.Border(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("8"))
 	}
-	return style.Render(lipgloss.NewStyle().Bold(true).Render(title) + "\n" + content)
+	return style.Render(inner)
 }
