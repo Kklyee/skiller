@@ -278,6 +278,8 @@ func (m *Model) reconcileTitle() string {
 	label := "Group"
 	if m.planKind == "profile" {
 		label = "Profile"
+	} else if m.planKind == "project" {
+		label = "Project"
 	}
 	return "Activate " + label + ": " + m.plan.Group
 }

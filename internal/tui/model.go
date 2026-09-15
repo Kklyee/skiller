@@ -8,6 +8,7 @@ import (
 	"github.com/Kklyee/skiller/internal/paths"
 	"github.com/Kklyee/skiller/internal/pin"
 	"github.com/Kklyee/skiller/internal/profile"
+	"github.com/Kklyee/skiller/internal/project"
 	skillprovenance "github.com/Kklyee/skiller/internal/provenance"
 	"github.com/Kklyee/skiller/internal/reconcile"
 	"github.com/Kklyee/skiller/internal/transaction"
@@ -26,6 +27,7 @@ const (
 	ScreenDoctor
 	ScreenHelp
 	ScreenProfiles
+	ScreenProject
 )
 
 type Focus uint8
@@ -52,6 +54,11 @@ type Model struct {
 	pins       []string
 	provenance map[string]skillprovenance.Entry
 	summary    catalog.Summary
+
+	projectConfig project.Config
+	projectPath   string
+	projectLoaded bool
+	projectError  string
 
 	screen Screen
 	focus  Focus
@@ -637,6 +644,68 @@ func (m *Model) openProfileReconcile() {
 	}
 	slices.Sort(m.plan.Issues)
 	m.planKind = "profile"
+	m.modal = modalReconcile
+}
+
+func (m *Model) openProject() {
+	m.projectConfig = project.Config{}
+	m.projectPath = ""
+	m.projectLoaded = false
+	m.projectError = ""
+	config, path, err := project.Load(".")
+	if err != nil {
+		m.projectError = err.Error()
+	} else {
+		m.projectConfig = config
+		m.projectPath = path
+		m.projectLoaded = true
+	}
+	m.screen = ScreenProject
+	m.clearMessage()
+}
+
+func (m *Model) projectTarget() (group.Group, []string, error) {
+	if !m.projectLoaded {
+		return group.Group{}, nil, fmt.Errorf("project config is not loaded")
+	}
+	config := m.projectConfig
+	base := group.Group{Name: "project", Skills: config.Skills}
+	missingGroups := []string(nil)
+	if config.Profile != "" {
+		stored, ok := m.profileByName(config.Profile)
+		if !ok {
+			return group.Group{}, nil, fmt.Errorf("profile %q does not exist", config.Profile)
+		}
+		target := profile.Resolve(stored, m.groups)
+		base = target.Group
+		missingGroups = target.MissingGroups
+	}
+	base = project.ApplyOverrides(base, config.Include, config.Exclude)
+	base.Name = "project"
+	return base, missingGroups, nil
+}
+
+func (m *Model) profileByName(name string) (profile.Profile, bool) {
+	for _, stored := range m.profiles {
+		if stored.Name == name {
+			return stored, true
+		}
+	}
+	return profile.Profile{}, false
+}
+
+func (m *Model) openProjectReconcile() {
+	target, missingGroups, err := m.projectTarget()
+	if err != nil {
+		m.setMessage(messageError, err.Error())
+		return
+	}
+	m.plan = reconcile.BuildWithPins(target, m.skills, m.pins)
+	for _, name := range missingGroups {
+		m.plan.Issues = append(m.plan.Issues, fmt.Sprintf("missing group %s", name))
+	}
+	slices.Sort(m.plan.Issues)
+	m.planKind = "project"
 	m.modal = modalReconcile
 }
 

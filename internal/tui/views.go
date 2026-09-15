@@ -53,6 +53,8 @@ func (m *Model) viewContent() string {
 		return m.viewHelp()
 	case ScreenProfiles:
 		return m.viewProfiles()
+	case ScreenProject:
+		return m.viewProject()
 	default:
 		return m.viewMain()
 	}
@@ -207,6 +209,100 @@ func (m *Model) profileApplied(stored profile.Profile) bool {
 
 func profileSummary(stored profile.Profile) string {
 	return fmt.Sprintf("%d groups  %d skills  %d excluded", len(stored.Groups), len(stored.Skills), len(stored.Exclude))
+}
+
+func (m *Model) viewProject() string {
+	leftWidth := m.width / 3
+	if leftWidth < 34 {
+		leftWidth = 34
+	}
+	if leftWidth > 48 {
+		leftWidth = 48
+	}
+	if leftWidth > m.width-24 {
+		leftWidth = m.width - 24
+	}
+	if leftWidth < 4 {
+		leftWidth = 4
+	}
+	rightWidth := m.width - leftWidth
+	panelHeight := m.height - 3
+	if panelHeight < 3 {
+		panelHeight = 3
+	}
+	footer := renderKeyHints(
+		keyHint{key: "u/enter", description: "use"},
+		keyHint{key: "r", description: "reload"},
+		keyHint{key: "esc", description: "back"},
+	)
+	return strings.Join([]string{
+		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Project"),
+		lipgloss.JoinHorizontal(
+			lipgloss.Top,
+			m.panel("Configuration", m.viewProjectConfig(), leftWidth, panelHeight, true),
+			m.panel("Effective Environment", m.viewProjectDetails(), rightWidth, panelHeight, false),
+		),
+		footer,
+	}, "\n")
+}
+
+func (m *Model) viewProjectConfig() string {
+	if !m.projectLoaded {
+		lines := []string{helpTextStyle().Render("No .skiller.toml found")}
+		if m.projectError != "" {
+			lines = append(lines, "", helpTextStyle().Render(m.projectError))
+		}
+		return strings.Join(lines, "\n")
+	}
+	base := "Skills"
+	baseValue := m.projectConfig.Skills
+	if m.projectConfig.Profile != "" {
+		base = "Profile"
+		baseValue = []string{m.projectConfig.Profile}
+	}
+	return strings.Join([]string{
+		"File: " + helpTextStyle().Render(m.projectPath),
+		base + ": " + listOrDash(baseValue),
+		"Include: " + listOrDash(m.projectConfig.Include),
+		"Exclude: " + listOrDash(m.projectConfig.Exclude),
+	}, "\n")
+}
+
+func (m *Model) viewProjectDetails() string {
+	if !m.projectLoaded {
+		return helpTextStyle().Render("Create .skiller.toml to define a project environment")
+	}
+	target, missingGroups, err := m.projectTarget()
+	if err != nil {
+		return messageStyle(messageError).Render(err.Error())
+	}
+	lines := []string{
+		"Desired active: " + fmt.Sprintf("%d skills", len(target.Skills)),
+		"Status: " + m.projectStatus(),
+		"Skills: " + listOrDash(target.Skills),
+	}
+	if len(missingGroups) > 0 {
+		lines = append(lines, messageStyle(messageError).Render("Missing groups: "+strings.Join(missingGroups, ", ")))
+	}
+	if missing := profile.MissingSkills(profile.Target{Group: target}, m.skills); len(missing) > 0 {
+		lines = append(lines, messageStyle(messageError).Render("Missing skills: "+strings.Join(missing, ", ")))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (m *Model) projectStatus() string {
+	target, missingGroups, err := m.projectTarget()
+	if err != nil || len(missingGroups) > 0 || len(profile.MissingSkills(profile.Target{Group: target}, m.skills)) > 0 {
+		return messageStyle(messageError).Render("Needs attention")
+	}
+	plan := reconcile.BuildWithPins(target, m.skills, m.pins)
+	if plan.HasIssues() {
+		return messageStyle(messageError).Render("Needs attention")
+	}
+	if plan.Changes() == 0 {
+		return stateStyle(catalog.StateActive).Render("● Applied")
+	}
+	return stateStyle(catalog.StateDisabled).Render("○ Not applied")
 }
 
 func listOrDash(values []string) string {
@@ -395,6 +491,7 @@ func (m *Model) viewFooter() string {
 		keyHint{key: "/", description: "search"},
 		keyHint{key: "g", description: "groups"},
 		keyHint{key: "p", description: "profiles"},
+		keyHint{key: "o", description: "project"},
 		keyHint{key: "u", description: "use"},
 	)
 	if m.focus == FocusGroups {
@@ -645,6 +742,7 @@ func (m *Model) viewHelp() string {
 		helpLine("/", "search by ID, metadata, or group"),
 		helpLine("g", "group management"),
 		helpLine("p", "profile environments"),
+		helpLine("o", "project environment"),
 		helpLine("u", "preview and apply selected group"),
 		helpLine("enter", "expand details"),
 		helpLine("d", "doctor/status"),

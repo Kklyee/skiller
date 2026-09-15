@@ -154,6 +154,40 @@ func TestProfilesPageShowsProfileAndOpensPreview(t *testing.T) {
 	}
 }
 
+func TestProjectPageShowsConfigAndOpensPreview(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+	createSkill(t, disabledDir, "beta", "Beta", "Second skill")
+	if err := os.WriteFile(filepath.Join(root, ".skiller.toml"), []byte("skills = [\"alpha\"]\ninclude = [\"beta\"]\nexclude = []\n"), 0o644); err != nil {
+		t.Fatalf("write project config: %v", err)
+	}
+
+	model, err := NewModel(paths.Set{
+		Active: activeDir, Disabled: disabledDir, Groups: filepath.Join(root, "groups"),
+		Profiles: filepath.Join(root, "profiles"), Journal: filepath.Join(root, "transaction.json"), Lock: filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(keyText("o"))
+	view := viewText(&model)
+	for _, want := range []string{"Skiller / Project", ".skiller.toml", "alpha", "beta", "Include"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("project page missing %q:\n%s", want, view)
+		}
+	}
+	model.Update(keyCode(bubbletea.KeyEnter))
+	if model.modal != modalReconcile || model.plan.Group != "project" {
+		t.Fatalf("project use did not open preview: modal=%v plan=%+v", model.modal, model.plan)
+	}
+	if !strings.Contains(viewText(&model), "Activate Project: project") {
+		t.Fatalf("project preview title missing:\n%s", viewText(&model))
+	}
+}
+
 func TestDetailsPanelShowsSkillProvenance(t *testing.T) {
 	root := t.TempDir()
 	activeDir := filepath.Join(root, "active")

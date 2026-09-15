@@ -80,6 +80,8 @@ func (m *Model) updateKey(message bubbletea.KeyPressMsg) bubbletea.Cmd {
 		return m.updateGroups(message, key)
 	case ScreenProfiles:
 		return m.updateProfiles(message, key)
+	case ScreenProject:
+		return m.updateProject(message, key)
 	case ScreenGroupDetails, ScreenDoctor, ScreenHelp:
 		if key == "esc" || key == "q" {
 			m.screen = ScreenMain
@@ -139,6 +141,8 @@ func (m *Model) updateKey(message bubbletea.KeyPressMsg) bubbletea.Cmd {
 		m.openGroups()
 	case "p":
 		m.openProfiles()
+	case "o":
+		m.openProject()
 	case "u":
 		m.openReconcile()
 	case "d":
@@ -165,6 +169,21 @@ func (m *Model) updateProfiles(message bubbletea.KeyPressMsg, key string) bubble
 		m.moveProfile(1)
 	case "u", "enter":
 		m.openProfileReconcile()
+	}
+	return nil
+}
+
+func (m *Model) updateProject(message bubbletea.KeyPressMsg, key string) bubbletea.Cmd {
+	switch key {
+	case "ctrl+c", "q":
+		return bubbletea.Quit
+	case "esc":
+		m.screen = ScreenMain
+		m.clearMessage()
+	case "u", "enter":
+		m.openProjectReconcile()
+	case "r":
+		m.openProject()
 	}
 	return nil
 }
