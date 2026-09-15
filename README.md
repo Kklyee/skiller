@@ -72,7 +72,7 @@ skiller pin code-review
 skiller unpin code-review
 ```
 
-`pin` 只接受当前电脑上已安装的 Skill。省略 Skill ID 执行 `skiller pin` 时，工具会列出本机 Skill，输入编号并用逗号分隔即可多选，例如输入 `1,3,5`；也可以输入 `a` 全选或 `q` 取消。
+`pin` 只接受当前电脑上已安装的 Skill。省略 Skill ID 执行 `skiller pin` 时，工具会列出尚未 pin 的本机 Skill，输入编号并用逗号分隔即可多选，例如输入 `1,3,5`；也可以输入 `a` 全选或 `q` 取消。省略参数执行 `skiller unpin` 时，工具会列出当前已经 pin 的 Skill，并显示其状态，方便选择移除。
 
 安装器桥接：
 

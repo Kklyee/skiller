@@ -33,8 +33,13 @@ func NewPin() *cobra.Command {
 
 			selected := args
 			if len(selected) == 0 {
+				pinned, err := loadPins(pathSet)
+				if err != nil {
+					return err
+				}
+				available := unpinnedSkills(skills, pinned)
 				var cancelled bool
-				selected, cancelled, err = selectSkills(cmd, skills)
+				selected, cancelled, err = selectSkills(cmd, available)
 				if err != nil {
 					return err
 				}
@@ -56,6 +61,22 @@ func NewPin() *cobra.Command {
 			return err
 		},
 	}
+}
+
+func unpinnedSkills(installed []catalog.Skill, pinned []string) []catalog.Skill {
+	pinnedSet := make(map[string]struct{}, len(pinned))
+	for _, id := range pinned {
+		pinnedSet[id] = struct{}{}
+	}
+
+	available := make([]catalog.Skill, 0, len(installed))
+	for _, skill := range installed {
+		if _, ok := pinnedSet[skill.ID]; ok {
+			continue
+		}
+		available = append(available, skill)
+	}
+	return available
 }
 
 func validateInstalledSkills(selected []string, installed []catalog.Skill) error {
@@ -81,15 +102,49 @@ func validateInstalledSkills(selected []string, installed []catalog.Skill) error
 
 func selectSkills(cmd *cobra.Command, installed []catalog.Skill) ([]string, bool, error) {
 	if len(installed) == 0 {
-		return nil, false, errors.New("no installed skills available to pin")
+		return nil, false, errors.New("no unpinned skills available to pin")
 	}
 
+	options := make([]skillOption, 0, len(installed))
+	for _, skill := range installed {
+		options = append(options, skillOption{ID: skill.ID, Status: skill.State.String()})
+	}
+	return selectSkillOptions(cmd, "Available skills to pin:", options)
+}
+
+type skillOption struct {
+	ID     string
+	Status string
+}
+
+func selectPinnedSkills(cmd *cobra.Command, pinned []string, installed []catalog.Skill) ([]string, bool, error) {
+	if len(pinned) == 0 {
+		return nil, false, errors.New("no pinned skills available to unpin")
+	}
+
+	statusByID := make(map[string]string, len(installed))
+	for _, skill := range installed {
+		statusByID[skill.ID] = skill.State.String()
+	}
+
+	options := make([]skillOption, 0, len(pinned))
+	for _, id := range pinned {
+		status := "missing"
+		if value, ok := statusByID[id]; ok {
+			status = value
+		}
+		options = append(options, skillOption{ID: id, Status: status})
+	}
+	return selectSkillOptions(cmd, "Pinned skills:", options)
+}
+
+func selectSkillOptions(cmd *cobra.Command, title string, options []skillOption) ([]string, bool, error) {
 	out := cmd.OutOrStdout()
-	if _, err := fmt.Fprintln(out, "Installed skills:"); err != nil {
+	if _, err := fmt.Fprintln(out, title); err != nil {
 		return nil, false, fmt.Errorf("write skill picker: %w", err)
 	}
-	for index, skill := range installed {
-		if _, err := fmt.Fprintf(out, "%d) %s [%s]\n", index+1, skill.ID, skill.State.String()); err != nil {
+	for index, option := range options {
+		if _, err := fmt.Fprintf(out, "%d) %s [%s]\n", index+1, option.ID, option.Status); err != nil {
 			return nil, false, fmt.Errorf("write skill picker: %w", err)
 		}
 	}
@@ -109,9 +164,9 @@ func selectSkills(cmd *cobra.Command, installed []catalog.Skill) ([]string, bool
 		return nil, true, nil
 	}
 	if strings.EqualFold(selection, "a") || strings.EqualFold(selection, "all") {
-		selected := make([]string, 0, len(installed))
-		for _, skill := range installed {
-			selected = append(selected, skill.ID)
+		selected := make([]string, 0, len(options))
+		for _, option := range options {
+			selected = append(selected, option.ID)
 		}
 		return selected, false, nil
 	}
@@ -122,14 +177,14 @@ func selectSkills(cmd *cobra.Command, installed []catalog.Skill) ([]string, bool
 		return r == ',' || unicode.IsSpace(r)
 	}) {
 		index, err := strconv.Atoi(token)
-		if err != nil || index < 1 || index > len(installed) {
-			return nil, false, fmt.Errorf("invalid skill selection %q: choose numbers from 1 to %d", token, len(installed))
+		if err != nil || index < 1 || index > len(options) {
+			return nil, false, fmt.Errorf("invalid skill selection %q: choose numbers from 1 to %d", token, len(options))
 		}
 		if _, ok := seen[index]; ok {
 			continue
 		}
 		seen[index] = struct{}{}
-		selected = append(selected, installed[index-1].ID)
+		selected = append(selected, options[index-1].ID)
 	}
 	if len(selected) == 0 {
 		return nil, false, errors.New("select at least one skill")
@@ -139,15 +194,36 @@ func selectSkills(cmd *cobra.Command, installed []catalog.Skill) ([]string, bool
 
 func NewUnpin() *cobra.Command {
 	return &cobra.Command{
-		Use:   "unpin <skills...>",
+		Use:   "unpin [skills...]",
 		Short: "Remove skills from the pinned baseline",
-		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			pathSet, err := paths.Default()
 			if err != nil {
 				return err
 			}
-			count, err := pin.New(pathSet.Pins).Remove(args...)
+
+			selected := args
+			if len(selected) == 0 {
+				pinned, err := loadPins(pathSet)
+				if err != nil {
+					return err
+				}
+				skills, err := catalog.Scan(pathSet.Active, pathSet.Disabled)
+				if err != nil {
+					return fmt.Errorf("inspect installed skills: %w", err)
+				}
+				var cancelled bool
+				selected, cancelled, err = selectPinnedSkills(cmd, pinned, skills)
+				if err != nil {
+					return err
+				}
+				if cancelled {
+					_, err := fmt.Fprintln(cmd.OutOrStdout(), "Cancelled")
+					return err
+				}
+			}
+
+			count, err := pin.New(pathSet.Pins).Remove(selected...)
 			if err != nil {
 				return err
 			}
