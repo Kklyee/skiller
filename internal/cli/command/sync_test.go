@@ -2,6 +2,7 @@ package command
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -167,6 +168,38 @@ func TestSyncRequiresProjectConfig(t *testing.T) {
 	err := cmd.Execute()
 	if err == nil || !strings.Contains(err.Error(), project.ConfigFileName) {
 		t.Fatalf("expected project config error, got %v", err)
+	}
+}
+
+func TestSyncCheckReportsOutOfSyncWithDedicatedExitCode(t *testing.T) {
+	root := t.TempDir()
+	projectDir := filepath.Join(root, "project")
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	createSkill(t, activeDir, "old")
+	createSkill(t, disabledDir, "wanted")
+	writeProjectConfig(t, projectDir, "skills = [\"wanted\"]\n")
+	setSyncPaths(t, activeDir, disabledDir, filepath.Join(root, "groups"), filepath.Join(root, "profiles"))
+	t.Chdir(projectDir)
+
+	var output bytes.Buffer
+	cmd := NewSync()
+	cmd.SetArgs([]string{"--check"})
+	cmd.SetOut(&output)
+	cmd.SetErr(&output)
+	err := cmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "out of sync") {
+		t.Fatalf("sync check error: %v\n%s", err, output.String())
+	}
+	var coded interface{ ExitCode() int }
+	if !errors.As(err, &coded) || coded.ExitCode() != 2 {
+		t.Fatalf("sync check exit code: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(activeDir, "old", "SKILL.md")); err != nil {
+		t.Fatalf("sync check changed old skill: %v", err)
 	}
 }
 

@@ -2,6 +2,7 @@ package command
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -75,6 +76,35 @@ func TestListCommandSurfacesInstallerConflict(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(disabledDir, "research", "SKILL.md")); err != nil {
 		t.Fatalf("disabled copy was removed: %v", err)
+	}
+}
+
+func TestListCommandJSON(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	createSkill(t, activeDir, "research")
+	createSkill(t, disabledDir, "prototype")
+	t.Setenv("SKILLER_ACTIVE_DIR", activeDir)
+	t.Setenv("SKILLER_DISABLED_DIR", disabledDir)
+
+	var output bytes.Buffer
+	cmd := NewList()
+	cmd.SetArgs([]string{"--json"})
+	cmd.SetOut(&output)
+	cmd.SetErr(&output)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute JSON list: %v", err)
+	}
+	var rows []struct {
+		ID     string `json:"id"`
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal(output.Bytes(), &rows); err != nil {
+		t.Fatalf("decode list JSON: %v\n%s", err, output.String())
+	}
+	if len(rows) != 2 || rows[0].ID != "prototype" || rows[0].Status != "disabled" || rows[1].ID != "research" || rows[1].Status != "active" {
+		t.Fatalf("list JSON: %#v", rows)
 	}
 }
 

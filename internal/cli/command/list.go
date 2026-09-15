@@ -10,7 +10,8 @@ import (
 )
 
 func NewList() *cobra.Command {
-	return &cobra.Command{
+	var asJSON bool
+	command := &cobra.Command{
 		Use:   "list",
 		Short: "List installed skills",
 		Args:  cobra.NoArgs,
@@ -20,13 +21,15 @@ func NewList() *cobra.Command {
 			if err != nil {
 				return err
 			}
-
 			skills, err := catalog.Scan(
 				pathSet.Active,
 				pathSet.Disabled,
 			)
 			if err != nil {
 				return err
+			}
+			if asJSON {
+				return writeJSON(cmd.OutOrStdout(), listJSON(skills))
 			}
 
 			w := tabwriter.NewWriter(
@@ -64,4 +67,26 @@ func NewList() *cobra.Command {
 			return nil
 		},
 	}
+	command.Flags().BoolVar(&asJSON, "json", false, "write JSON output")
+	return command
+}
+
+type listJSONRow struct {
+	ID          string `json:"id"`
+	Status      string `json:"status"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+func listJSON(skills []catalog.Skill) []listJSONRow {
+	rows := make([]listJSONRow, 0, len(skills))
+	for _, skill := range skills {
+		rows = append(rows, listJSONRow{
+			ID:          skill.ID,
+			Status:      skill.State.String(),
+			Name:        skill.Name,
+			Description: skill.Description,
+		})
+	}
+	return rows
 }

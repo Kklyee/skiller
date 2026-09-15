@@ -149,7 +149,20 @@ skills = ["code-review", "tdd"]
 ```bash
 skiller sync --dry-run
 skiller sync
+skiller sync --check
 ```
+
+`--check` 只检查项目环境是否与配置一致，发现漂移时返回退出码 `2`，适合 CI。
+
+## 机器可读输出
+
+```bash
+skiller list --json
+skiller status --json
+skiller doctor --json
+```
+
+这些命令输出稳定的 JSON 字段，便于脚本和 CI 使用。
 
 ## 启动 Agent
 
@@ -218,6 +231,7 @@ Skiller 不删除或修改 Skill 的 `SKILL.md`。批量切换使用事务和锁
 skiller doctor
 skiller list
 skiller status
+skiller status --json
 skiller enable <skill>
 skiller disable <skill>
 skiller info <skill>
@@ -233,6 +247,7 @@ skiller group <list|create|delete|show|add|remove>
 skiller use <group> [--dry-run]
 skiller profile <list|show|create|edit|delete|use>
 skiller sync [--dry-run]
+skiller sync --check
 skiller run <codex|gemini|opencode> [--restore]
 skiller tui
 ```

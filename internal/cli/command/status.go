@@ -10,7 +10,8 @@ import (
 )
 
 func NewStatus() *cobra.Command {
-	return &cobra.Command{
+	var asJSON bool
+	command := &cobra.Command{
 		Use:   "status",
 		Short: "Show installed skill status",
 		Args:  cobra.NoArgs,
@@ -20,13 +21,15 @@ func NewStatus() *cobra.Command {
 			if err != nil {
 				return err
 			}
-
 			summary, err := catalog.SummaryFor(
 				pathSet.Active,
 				pathSet.Disabled,
 			)
 			if err != nil {
 				return err
+			}
+			if asJSON {
+				return writeJSON(cmd.OutOrStdout(), statusJSON(summary))
 			}
 
 			w := tabwriter.NewWriter(
@@ -64,5 +67,31 @@ func NewStatus() *cobra.Command {
 
 			return nil
 		},
+	}
+	command.Flags().BoolVar(&asJSON, "json", false, "write JSON output")
+	return command
+}
+
+type statusJSONRow struct {
+	Installed   int    `json:"installed"`
+	Active      int    `json:"active"`
+	Disabled    int    `json:"disabled"`
+	Conflict    int    `json:"conflict"`
+	Broken      int    `json:"broken"`
+	Invalid     int    `json:"invalid"`
+	ActiveDir   string `json:"active_dir"`
+	DisabledDir string `json:"disabled_dir"`
+}
+
+func statusJSON(summary catalog.Summary) statusJSONRow {
+	return statusJSONRow{
+		Installed:   summary.Installed,
+		Active:      summary.Active,
+		Disabled:    summary.Disabled,
+		Conflict:    summary.Conflict,
+		Broken:      summary.Broken,
+		Invalid:     summary.Invalid,
+		ActiveDir:   summary.ActiveDir,
+		DisabledDir: summary.DisabledDir,
 	}
 }

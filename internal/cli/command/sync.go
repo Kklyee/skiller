@@ -17,6 +17,7 @@ import (
 
 func NewSync() *cobra.Command {
 	var dryRun bool
+	var check bool
 
 	command := &cobra.Command{
 		Use:   "sync",
@@ -34,6 +35,15 @@ func NewSync() *cobra.Command {
 			}
 			if err := writePlan(cmd, plan); err != nil {
 				return err
+			}
+			if check {
+				if plan.HasIssues() {
+					return checkFailure("project skill environment has issues")
+				}
+				if plan.Changes() > 0 {
+					return checkFailure("project skill environment is out of sync")
+				}
+				return nil
 			}
 			if dryRun {
 				return nil
@@ -62,6 +72,7 @@ func NewSync() *cobra.Command {
 		},
 	}
 	command.Flags().BoolVar(&dryRun, "dry-run", false, "show the plan without changing skills")
+	command.Flags().BoolVar(&check, "check", false, "check whether the project environment is synchronized")
 
 	return command
 }
