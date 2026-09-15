@@ -100,6 +100,20 @@ func (s Store) Remove(id string) error {
 	return s.write(file{Skills: entries})
 }
 
+func (s Store) Replace(entries map[string]Entry) error {
+	if s.Path == "" {
+		return errors.New("provenance file path is empty")
+	}
+	updated := make(map[string]Entry, len(entries))
+	for id, entry := range entries {
+		if err := validateID(id); err != nil {
+			return err
+		}
+		updated[id] = entry
+	}
+	return s.write(file{Skills: updated})
+}
+
 func (s Store) write(stored file) error {
 	var data bytes.Buffer
 	if err := toml.NewEncoder(&data).Encode(stored); err != nil {
