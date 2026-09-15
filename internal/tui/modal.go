@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/Kklyee/skiller/internal/doctor"
 	"github.com/Kklyee/skiller/internal/group"
+	"github.com/Kklyee/skiller/internal/profile"
 	"github.com/Kklyee/skiller/internal/transaction"
 	"strings"
 )
@@ -17,6 +18,8 @@ const (
 	modalReconcile
 	modalDeleteGroup
 	modalGroupName
+	modalDeleteProfile
+	modalProfileName
 	modalBatch
 	modalBatchGroup
 	modalPalette
@@ -128,6 +131,59 @@ func (m *Model) updateModal(message bubbletea.KeyPressMsg) bubbletea.Cmd {
 			}
 		default:
 			m.input += message.Text
+		}
+		return nil
+	}
+
+	if m.modal == modalProfileName {
+		switch message.String() {
+		case "esc":
+			m.modal = modalNone
+			m.clearMessage()
+		case "enter":
+			name := strings.TrimSpace(m.input)
+			if name == "" {
+				m.setMessage(messageInfo, "Profile name is required")
+				return nil
+			}
+			if _, err := profile.New(m.paths.Profiles).Create(name); err != nil {
+				m.setError(err)
+				return nil
+			} else if err := m.refresh(); err != nil {
+				m.setError(err)
+				return nil
+			} else {
+				m.selectedProfile = name
+				m.modal = modalNone
+				m.setMessage(messageSuccess, fmt.Sprintf("Created profile %s; configure fields", name))
+				m.openProfileEditor()
+			}
+		case "backspace", "delete":
+			runes := []rune(m.input)
+			if len(runes) > 0 {
+				m.input = string(runes[:len(runes)-1])
+			}
+		default:
+			m.input += message.Text
+		}
+		return nil
+	}
+
+	if m.modal == modalDeleteProfile {
+		if key == "esc" || key == "n" {
+			m.modal = modalNone
+			m.clearMessage()
+			return nil
+		}
+		if key == "enter" || strings.EqualFold(key, "y") {
+			if err := profile.New(m.paths.Profiles).Delete(m.deleteProfile); err != nil {
+				m.setError(err)
+			} else if err := m.refresh(); err != nil {
+				m.setError(err)
+			} else {
+				m.setMessage(messageSuccess, fmt.Sprintf("Deleted profile %s", m.deleteProfile))
+			}
+			m.modal = modalNone
 		}
 		return nil
 	}
@@ -329,6 +385,43 @@ func (m *Model) viewGroupNameModal() string {
 			keyHint{key: "type", description: "name"},
 			keyHint{key: "enter", description: "create"},
 			keyHint{key: "esc", description: "cancel"},
+		),
+	}, "\n")
+}
+
+func (m *Model) viewProfileNameModal() string {
+	lines := []string{
+		helpTextStyle().Render("Create a reusable skill environment"),
+		"",
+		helpTextStyle().Render("Profile name"),
+		selectedRowStyle().Render(m.input + "▌"),
+	}
+	if m.message != "" {
+		lines = append(lines, "", m.renderedMessage())
+	}
+	return strings.Join([]string{
+		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Profiles"),
+		m.panel("New Profile", strings.Join(lines, "\n"), m.width, m.height-3, true),
+		renderKeyHints(
+			keyHint{key: "type", description: "name"},
+			keyHint{key: "enter", description: "create"},
+			keyHint{key: "esc", description: "cancel"},
+		),
+	}, "\n")
+}
+
+func (m *Model) viewDeleteProfileModal() string {
+	lines := []string{
+		messageStyle(messageError).Render("Delete profile " + m.deleteProfile + "?"),
+		"",
+		helpTextStyle().Render("This removes profile metadata only; skills and groups are not changed."),
+	}
+	return strings.Join([]string{
+		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Profiles"),
+		m.panel("Confirm Delete", strings.Join(lines, "\n"), m.width, m.height-3, true),
+		renderKeyHints(
+			keyHint{key: "enter/y", description: "delete"},
+			keyHint{key: "esc/n", description: "cancel"},
 		),
 	}, "\n")
 }

@@ -35,6 +35,12 @@ func (m *Model) viewContent() string {
 	if m.modal == modalDeleteGroup {
 		return m.viewDeleteGroupModal()
 	}
+	if m.modal == modalProfileName {
+		return m.viewProfileNameModal()
+	}
+	if m.modal == modalDeleteProfile {
+		return m.viewDeleteProfileModal()
+	}
 	if m.modal == modalBatch {
 		return m.viewBatchModal()
 	}
@@ -58,6 +64,8 @@ func (m *Model) viewContent() string {
 		return m.viewHelp()
 	case ScreenProfiles:
 		return m.viewProfiles()
+	case ScreenProfileEditor:
+		return m.viewProfileEditor()
 	case ScreenProject:
 		return m.viewProject()
 	default:
@@ -132,6 +140,9 @@ func (m *Model) viewProfiles() string {
 	}
 	footer := renderKeyHints(
 		keyHint{key: "↑↓/jk", description: "move"},
+		keyHint{key: "n", description: "new"},
+		keyHint{key: "e", description: "edit"},
+		keyHint{key: "d", description: "delete"},
 		keyHint{key: "u/enter", description: "use"},
 		keyHint{key: "esc", description: "back"},
 	)
@@ -144,6 +155,86 @@ func (m *Model) viewProfiles() string {
 		),
 		footer,
 	}, "\n")
+}
+
+func (m *Model) viewProfileEditor() string {
+	sectionNames := []string{"Groups", "Skills", "Exclude"}
+	tabs := make([]string, 0, len(sectionNames))
+	for index, name := range sectionNames {
+		if index == m.profileEditorSection {
+			tabs = append(tabs, selectedRowStyle().Render("["+name+"]"))
+			continue
+		}
+		tabs = append(tabs, helpTextStyle().Render(name))
+	}
+	items := m.profileEditorItems()
+	footer := renderKeyHints(
+		keyHint{key: "↑↓/jk", description: "move"},
+		keyHint{key: "tab", description: "section"},
+		keyHint{key: "space", description: "toggle"},
+		keyHint{key: "a", description: "select all"},
+		keyHint{key: "enter", description: "save"},
+		keyHint{key: "esc", description: "cancel"},
+	)
+	title := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render("Skiller / Edit Profile")
+	panelHeight := m.height - lipgloss.Height(title) - lipgloss.Height(footer) - 2
+	if panelHeight < 3 {
+		panelHeight = 3
+	}
+	contentHeight := panelHeight - 5
+	if contentHeight < 1 {
+		contentHeight = 1
+	}
+	lines := []string{
+		strings.Join(tabs, "  "),
+		helpTextStyle().Render(fmt.Sprintf("Select %s (%d selected)", sectionNames[m.profileEditorSection], m.profileEditorSelectedCount())),
+		"",
+	}
+	if len(items) == 0 {
+		lines = append(lines, helpTextStyle().Render("No available items"))
+	} else {
+		start, end := viewportBounds(len(items), m.profileEditorIndex, contentHeight)
+		for index, id := range items[start:end] {
+			itemIndex := start + index
+			mark := editorUnselectedStyle().Render("[ ]")
+			if m.profileEditorChosen(id) {
+				mark = editorSelectedStyle().Render("[x]")
+			}
+			prefix := "  "
+			if itemIndex == m.profileEditorIndex {
+				prefix = editorCursorStyle().Render("> ")
+			}
+			pinMarker := ""
+			if m.profileEditorSection != profileEditorGroups && m.isPinned(id) {
+				pinMarker = " " + pinStyle().Render("◆")
+			}
+			lines = append(lines, prefix+mark+" "+id+pinMarker)
+		}
+	}
+	if m.message != "" {
+		lines = append(lines, "", m.renderedMessage())
+	}
+	return strings.Join([]string{
+		title,
+		m.panel("Edit Profile: "+m.profileEditor.Name, strings.Join(lines, "\n"), m.width, panelHeight, true),
+		footer,
+	}, "\n")
+}
+
+func (m *Model) profileEditorSelectedCount() int {
+	selected := m.profileEditorGroups
+	if m.profileEditorSection == profileEditorSkills {
+		selected = m.profileEditorSkills
+	} else if m.profileEditorSection == profileEditorExclude {
+		selected = m.profileEditorExclude
+	}
+	count := 0
+	for _, value := range selected {
+		if value {
+			count++
+		}
+	}
+	return count
 }
 
 func (m *Model) viewCommandPalette() string {
@@ -729,7 +820,11 @@ func (m *Model) viewGroupManagerDetails(width int) string {
 				members = append(members, messageStyle(messageInfo).Render("? ")+id+" (missing)")
 				continue
 			}
-			members = append(members, stateStyle(skill.State).Render(stateIcon(skill.State))+" "+displayName(skill))
+			pinMarker := ""
+			if m.isPinned(id) {
+				pinMarker = " " + pinStyle().Render("◆")
+			}
+			members = append(members, stateStyle(skill.State).Render(stateIcon(skill.State))+" "+displayName(skill)+pinMarker)
 		}
 		lines = append(lines, responsiveGrid(members, width)...)
 	}
@@ -816,7 +911,11 @@ func (m *Model) viewGroupEditor() string {
 		if index == m.editorIndex {
 			prefix = editorCursorStyle().Render("> ")
 		}
-		lines = append(lines, prefix+mark+" "+id)
+		pinMarker := ""
+		if m.isPinned(id) {
+			pinMarker = " " + pinStyle().Render("◆")
+		}
+		lines = append(lines, prefix+mark+" "+id+pinMarker)
 	}
 	if len(m.editorSkills) == 0 {
 		lines = append(lines, "  No installed skills")
@@ -831,6 +930,7 @@ func (m *Model) viewGroupEditor() string {
 			keyHint{key: "↑↓/jk", description: "move"},
 			keyHint{key: "space", description: "select"},
 			keyHint{key: "a", description: "select all"},
+			keyHint{key: "◆", description: "pinned"},
 			keyHint{key: "enter", description: "save"},
 			keyHint{key: "esc", description: "cancel"},
 		),
@@ -893,11 +993,13 @@ func (m *Model) viewHelp() string {
 		helpLine("/", "search by ID, metadata, or group"),
 		helpLine("g", "group management"),
 		helpLine("p", "profile environments"),
+		helpLine("n/e/d", "new, edit, or delete on management screens"),
 		helpLine("o", "project environment"),
 		helpLine(":", "command palette"),
 		helpLine("u", "preview and apply selected group"),
 		helpLine("enter", "expand details"),
 		helpLine("d", "doctor/status"),
+		helpLine("◆", "pinned skill; always active"),
 		helpLine("esc", "close or go back"),
 		helpLine("q", "quit"),
 	}
@@ -940,10 +1042,10 @@ func skillRowWithSelection(skill catalog.Skill, selected, pinned, marked bool) s
 	if selected {
 		name = selectedRowStyle().Render(name)
 	}
-	row := fmt.Sprintf("%s %s", stateStyle(skill.State).Render(stateIcon(skill.State)), name)
 	if pinned {
-		row = pinStyle().Render("◆") + " " + row
+		name += " " + pinStyle().Render("◆")
 	}
+	row := fmt.Sprintf("%s %s", stateStyle(skill.State).Render(stateIcon(skill.State)), name)
 	if marked {
 		row = selectionStyle().Render("✓") + " " + row
 	}

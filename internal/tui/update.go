@@ -2,6 +2,7 @@ package tui
 
 import (
 	bubbletea "charm.land/bubbletea/v2"
+	"fmt"
 	"github.com/Kklyee/skiller/internal/doctor"
 )
 
@@ -72,6 +73,9 @@ func (m *Model) updateKey(message bubbletea.KeyPressMsg) bubbletea.Cmd {
 	}
 	if m.screen == ScreenGroupEditor {
 		return m.updateEditor(message)
+	}
+	if m.screen == ScreenProfileEditor {
+		return m.updateProfileEditor(message)
 	}
 
 	key := message.String()
@@ -171,6 +175,12 @@ func (m *Model) updateProfiles(message bubbletea.KeyPressMsg, key string) bubble
 		m.moveProfile(-1)
 	case "down", "j":
 		m.moveProfile(1)
+	case "n":
+		m.openProfileName()
+	case "e":
+		m.openProfileEditor()
+	case "d":
+		m.openDeleteProfile()
 	case "u", "enter":
 		m.openProfileReconcile()
 	}
@@ -270,6 +280,11 @@ func (m *Model) updateEditor(message bubbletea.KeyPressMsg) bubbletea.Cmd {
 	case "space":
 		if len(m.editorSkills) > 0 {
 			id := m.editorSkills[m.editorIndex]
+			if m.isPinned(id) {
+				m.editorChosen[id] = true
+				m.setMessage(messageInfo, fmt.Sprintf("Pinned skill %s must stay in every group", id))
+				return nil
+			}
 			m.editorChosen[id] = !m.editorChosen[id]
 		}
 	case "a":
@@ -278,6 +293,29 @@ func (m *Model) updateEditor(message bubbletea.KeyPressMsg) bubbletea.Cmd {
 		}
 	case "enter":
 		m.saveEditor()
+	}
+	return nil
+}
+
+func (m *Model) updateProfileEditor(message bubbletea.KeyPressMsg) bubbletea.Cmd {
+	switch message.String() {
+	case "esc":
+		m.screen = ScreenProfiles
+		m.clearMessage()
+	case "up", "k":
+		m.moveProfileEditor(-1)
+	case "down", "j":
+		m.moveProfileEditor(1)
+	case "tab", "right", "l":
+		m.changeProfileEditorSection(1)
+	case "shift+tab", "left", "h":
+		m.changeProfileEditorSection(-1)
+	case "space":
+		m.toggleProfileEditorSelection()
+	case "a":
+		m.selectAllProfileEditorItems()
+	case "enter":
+		m.saveProfileEditor()
 	}
 	return nil
 }

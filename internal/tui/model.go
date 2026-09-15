@@ -27,6 +27,7 @@ const (
 	ScreenDoctor
 	ScreenHelp
 	ScreenProfiles
+	ScreenProfileEditor
 	ScreenProject
 )
 
@@ -76,16 +77,24 @@ type Model struct {
 	paletteQuery string
 	paletteIndex int
 
-	modal       modal
-	plan        reconcile.Plan
-	planKind    string
-	input       string
-	deleteGroup string
+	modal         modal
+	plan          reconcile.Plan
+	planKind      string
+	input         string
+	deleteGroup   string
+	deleteProfile string
 
 	editorGroup  group.Group
 	editorSkills []string
 	editorChosen map[string]bool
 	editorIndex  int
+
+	profileEditor        profile.Profile
+	profileEditorGroups  map[string]bool
+	profileEditorSkills  map[string]bool
+	profileEditorExclude map[string]bool
+	profileEditorSection int
+	profileEditorIndex   int
 
 	doctorReport doctor.Report
 	message      string
@@ -102,6 +111,12 @@ type Model struct {
 }
 
 const allGroupName = "All"
+
+const (
+	profileEditorGroups = iota
+	profileEditorSkills
+	profileEditorExclude
+)
 
 func NewModel(pathSet paths.Set) (Model, error) {
 	model := Model{
@@ -319,6 +334,188 @@ func (m *Model) selectedProfileValue() (profile.Profile, bool) {
 	return profile.Profile{}, false
 }
 
+func (m *Model) openProfileName() {
+	m.input = ""
+	m.modal = modalProfileName
+	m.clearMessage()
+}
+
+func (m *Model) openProfileEditor() {
+	stored, ok := m.selectedProfileValue()
+	if !ok {
+		m.setMessage(messageInfo, "Select a profile before editing")
+		return
+	}
+	m.profileEditor = stored
+	m.profileEditorGroups = profileEditorSelection(stored.Groups)
+	m.profileEditorSkills = profileEditorSelection(stored.Skills)
+	m.profileEditorExclude = profileEditorSelection(stored.Exclude)
+	m.profileEditorSection = profileEditorGroups
+	m.profileEditorIndex = 0
+	m.screen = ScreenProfileEditor
+}
+
+func (m *Model) openDeleteProfile() {
+	if m.selectedProfile == "" {
+		m.setMessage(messageInfo, "Select a profile before deleting")
+		return
+	}
+	m.deleteProfile = m.selectedProfile
+	m.modal = modalDeleteProfile
+}
+
+func profileEditorSelection(values []string) map[string]bool {
+	selected := make(map[string]bool, len(values))
+	for _, value := range values {
+		selected[value] = true
+	}
+	return selected
+}
+
+func (m *Model) profileEditorItems() []string {
+	return m.profileEditorItemsFor(m.profileEditorSection)
+}
+
+func (m *Model) profileEditorItemsFor(section int) []string {
+	selected := m.profileEditorGroups
+	items := make([]string, 0)
+	if section == profileEditorGroups {
+		items = make([]string, 0, len(m.groups)+len(selected))
+		for _, current := range m.groups {
+			items = append(items, current.Name)
+		}
+	} else {
+		if section == profileEditorSkills {
+			selected = m.profileEditorSkills
+		} else {
+			selected = m.profileEditorExclude
+		}
+		items = make([]string, 0, len(m.skills)+len(selected))
+		for _, skill := range m.skills {
+			items = append(items, skill.ID)
+		}
+	}
+	known := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		known[item] = struct{}{}
+	}
+	for item := range selected {
+		if _, ok := known[item]; ok {
+			continue
+		}
+		items = append(items, item)
+	}
+	slices.Sort(items)
+	return items
+}
+
+func (m *Model) profileEditorChosen(id string) bool {
+	switch m.profileEditorSection {
+	case profileEditorGroups:
+		return m.profileEditorGroups[id]
+	case profileEditorSkills:
+		return m.profileEditorSkills[id]
+	case profileEditorExclude:
+		return m.profileEditorExclude[id]
+	default:
+		return false
+	}
+}
+
+func (m *Model) toggleProfileEditorSelection() {
+	items := m.profileEditorItems()
+	if len(items) == 0 || m.profileEditorIndex < 0 || m.profileEditorIndex >= len(items) {
+		return
+	}
+	id := items[m.profileEditorIndex]
+	selected := m.profileEditorGroups
+	if m.profileEditorSection == profileEditorSkills {
+		selected = m.profileEditorSkills
+	} else if m.profileEditorSection == profileEditorExclude {
+		selected = m.profileEditorExclude
+	}
+	selected[id] = !selected[id]
+	if !selected[id] {
+		delete(selected, id)
+	}
+}
+
+func (m *Model) selectAllProfileEditorItems() {
+	items := m.profileEditorItems()
+	for _, id := range items {
+		selected := m.profileEditorGroups
+		if m.profileEditorSection == profileEditorSkills {
+			selected = m.profileEditorSkills
+		} else if m.profileEditorSection == profileEditorExclude {
+			selected = m.profileEditorExclude
+		}
+		selected[id] = true
+	}
+}
+
+func (m *Model) moveProfileEditor(delta int) {
+	items := m.profileEditorItems()
+	if len(items) == 0 {
+		m.profileEditorIndex = 0
+		return
+	}
+	m.profileEditorIndex += delta
+	if m.profileEditorIndex < 0 {
+		m.profileEditorIndex = 0
+	}
+	if m.profileEditorIndex >= len(items) {
+		m.profileEditorIndex = len(items) - 1
+	}
+}
+
+func (m *Model) changeProfileEditorSection(delta int) {
+	m.profileEditorSection += delta
+	if m.profileEditorSection < profileEditorGroups {
+		m.profileEditorSection = profileEditorExclude
+	}
+	if m.profileEditorSection > profileEditorExclude {
+		m.profileEditorSection = profileEditorGroups
+	}
+	m.profileEditorIndex = 0
+}
+
+func (m *Model) profileEditorValues(section int) []string {
+	items := m.profileEditorItemsFor(section)
+	values := make([]string, 0, len(items))
+	for _, id := range items {
+		selected := m.profileEditorGroups
+		if section == profileEditorSkills {
+			selected = m.profileEditorSkills
+		} else if section == profileEditorExclude {
+			selected = m.profileEditorExclude
+		}
+		if selected[id] {
+			values = append(values, id)
+		}
+	}
+	return values
+}
+
+func (m *Model) saveProfileEditor() {
+	updated := profile.Profile{
+		Name:    m.profileEditor.Name,
+		Groups:  m.profileEditorValues(profileEditorGroups),
+		Skills:  m.profileEditorValues(profileEditorSkills),
+		Exclude: m.profileEditorValues(profileEditorExclude),
+	}
+	if err := profile.New(m.paths.Profiles).Update(updated.Name, updated); err != nil {
+		m.setError(err)
+		return
+	}
+	if err := m.refresh(); err != nil {
+		m.setError(err)
+		return
+	}
+	m.selectedProfile = updated.Name
+	m.screen = ScreenProfiles
+	m.setMessage(messageSuccess, fmt.Sprintf("Saved profile %s", updated.Name))
+}
+
 func (m *Model) visibleSkills() []catalog.Skill {
 	groupIDs := map[string]bool(nil)
 	if m.selectedGroup != "" {
@@ -515,6 +712,24 @@ func (m *Model) applyBatchGroup() {
 		return
 	}
 	selectedGroup := m.groups[m.batchGroupIndex]
+	blocked := make([]string, 0)
+	if m.batchAction == batchActionRemoveGroup {
+		removable := make([]string, 0, len(ids))
+		for _, id := range ids {
+			if m.isPinned(id) {
+				blocked = append(blocked, id)
+				continue
+			}
+			removable = append(removable, id)
+		}
+		ids = removable
+		if len(ids) == 0 {
+			m.modal = modalNone
+			m.clearSelectedSkills()
+			m.setMessage(messageInfo, "Pinned skills stay in every group")
+			return
+		}
+	}
 	store := group.New(m.paths.Groups)
 	count := 0
 	var err error
@@ -539,7 +754,11 @@ func (m *Model) applyBatchGroup() {
 		action = "Added"
 		preposition = "to"
 	}
-	m.setMessage(messageSuccess, fmt.Sprintf("%s %d skills %s %s", action, count, preposition, selectedGroup.Name))
+	message := fmt.Sprintf("%s %d skills %s %s", action, count, preposition, selectedGroup.Name)
+	if len(blocked) > 0 {
+		message += "; pinned skills kept: " + strings.Join(blocked, ", ")
+	}
+	m.setMessage(messageSuccess, message)
 }
 
 func (m *Model) toggleSelectedSkill() {
@@ -740,6 +959,11 @@ func (m *Model) openEditor() {
 		for _, id := range group.Skills {
 			m.editorChosen[id] = true
 		}
+		for _, id := range m.pins {
+			if known[id] {
+				m.editorChosen[id] = true
+			}
+		}
 		m.editorIndex = 0
 		m.screen = ScreenGroupEditor
 		return
@@ -755,8 +979,14 @@ func (m *Model) saveEditor() {
 		}
 	}
 
-	if len(m.editorGroup.Skills) > 0 {
-		if _, err := store.Remove(m.editorGroup.Name, m.editorGroup.Skills...); err != nil {
+	removable := make([]string, 0, len(m.editorGroup.Skills))
+	for _, id := range m.editorGroup.Skills {
+		if !m.isPinned(id) {
+			removable = append(removable, id)
+		}
+	}
+	if len(removable) > 0 {
+		if _, err := store.Remove(m.editorGroup.Name, removable...); err != nil {
 			m.setError(err)
 			return
 		}

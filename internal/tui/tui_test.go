@@ -154,6 +154,87 @@ func TestProfilesPageShowsProfileAndOpensPreview(t *testing.T) {
 	}
 }
 
+func TestProfilesCanBeCreatedEditedAndDeletedInTUI(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	groupsDir := filepath.Join(root, "groups")
+	profilesDir := filepath.Join(root, "profiles")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+	createSkill(t, disabledDir, "beta", "Beta", "Second skill")
+	groups := group.New(groupsDir)
+	if _, err := groups.Create("coding"); err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	if _, err := groups.Add("coding", "alpha"); err != nil {
+		t.Fatalf("add group skill: %v", err)
+	}
+
+	model, err := NewModel(paths.Set{
+		Active: activeDir, Disabled: disabledDir, Groups: groupsDir, Profiles: profilesDir,
+		Journal: filepath.Join(root, "transaction.json"), Lock: filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(keyText("p"))
+	if !strings.Contains(viewText(&model), "n new") || !strings.Contains(viewText(&model), "e edit") {
+		t.Fatalf("profile management actions missing:\n%s", viewText(&model))
+	}
+
+	model.Update(keyText("n"))
+	model.Update(keyText("backend"))
+	model.Update(keyCode(bubbletea.KeyEnter))
+	if model.screen != ScreenProfileEditor {
+		t.Fatalf("screen after profile creation = %v, want profile editor", model.screen)
+	}
+	for _, want := range []string{"Edit Profile: backend", "Groups", "Skills", "Exclude", "coding"} {
+		if !strings.Contains(viewText(&model), want) {
+			t.Fatalf("profile editor missing %q:\n%s", want, viewText(&model))
+		}
+	}
+
+	model.Update(keyText(" "))
+	model.Update(keyCode(bubbletea.KeyTab))
+	if !strings.Contains(viewText(&model), "alpha") || !strings.Contains(viewText(&model), "beta") {
+		t.Fatalf("profile skill selector missing:\n%s", viewText(&model))
+	}
+	model.Update(keyText(" "))
+	model.Update(keyCode(bubbletea.KeyTab))
+	model.Update(keyCode(bubbletea.KeyDown))
+	model.Update(keyText(" "))
+	model.Update(keyCode(bubbletea.KeyEnter))
+
+	stored, err := profile.New(profilesDir).Get("backend")
+	if err != nil {
+		t.Fatalf("read created profile: %v", err)
+	}
+	if !slices.Equal(stored.Groups, []string{"coding"}) || !slices.Equal(stored.Skills, []string{"alpha"}) || !slices.Equal(stored.Exclude, []string{"beta"}) {
+		t.Fatalf("created profile = %+v", stored)
+	}
+
+	model.Update(keyText("e"))
+	if model.screen != ScreenProfileEditor {
+		t.Fatalf("screen after profile edit = %v, want profile editor", model.screen)
+	}
+	model.Update(keyCode(bubbletea.KeyTab))
+	model.Update(keyText(" "))
+	model.Update(keyCode(bubbletea.KeyEnter))
+	stored, err = profile.New(profilesDir).Get("backend")
+	if err != nil {
+		t.Fatalf("read edited profile: %v", err)
+	}
+	if len(stored.Skills) != 0 {
+		t.Fatalf("edited profile skills = %v, want empty", stored.Skills)
+	}
+
+	model.Update(keyText("d"))
+	model.Update(keyCode(bubbletea.KeyEnter))
+	if _, err := profile.New(profilesDir).Get("backend"); err == nil {
+		t.Fatal("deleted profile still exists")
+	}
+}
+
 func TestProjectPageShowsConfigAndOpensPreview(t *testing.T) {
 	root := t.TempDir()
 	t.Chdir(root)
@@ -1326,7 +1407,7 @@ func TestTUIShowsPinnedSkillsAndKeepsThemActive(t *testing.T) {
 	model.Update(keyCode(bubbletea.KeyDown))
 
 	view := viewText(&model)
-	if !strings.Contains(view, "◆ ○ Beta [beta]") {
+	if !strings.Contains(view, "○ Beta [beta] ◆") {
 		t.Fatalf("pinned skill marker missing:\n%s", view)
 	}
 	if !strings.Contains(view, "Pinned: yes") {
@@ -1480,6 +1561,50 @@ func TestMultiSelectBatchGroupAddAndRemove(t *testing.T) {
 	}
 }
 
+func TestMultiSelectBatchGroupRemoveKeepsPinnedSkills(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	groupsDir := filepath.Join(root, "groups")
+	pinsPath := filepath.Join(root, "pins.toml")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+	createSkill(t, activeDir, "beta", "Beta", "Second skill")
+	store := group.New(groupsDir)
+	if _, err := store.Create("coding"); err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	if _, err := store.Add("coding", "alpha", "beta"); err != nil {
+		t.Fatalf("add group skills: %v", err)
+	}
+	if _, err := pin.New(pinsPath).Add("beta"); err != nil {
+		t.Fatalf("pin skill: %v", err)
+	}
+
+	model, err := NewModel(paths.Set{
+		Active: activeDir, Disabled: filepath.Join(root, "disabled"), Groups: groupsDir, Pins: pinsPath,
+		Journal: filepath.Join(root, "transaction.json"), Lock: filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(keyCode(bubbletea.KeyTab))
+	model.Update(keyCode(bubbletea.KeyDown))
+	model.Update(keyText("x"))
+	model.Update(keyText("b"))
+	model.Update(keyText("r"))
+	model.Update(keyCode(bubbletea.KeyEnter))
+
+	created, err := store.Get("coding")
+	if err != nil {
+		t.Fatalf("read group after remove: %v", err)
+	}
+	if !slices.Equal(created.Skills, []string{"alpha", "beta"}) {
+		t.Fatalf("group skills after pinned remove = %v", created.Skills)
+	}
+	if !strings.Contains(viewText(&model), "Pinned skills stay in every group") {
+		t.Fatalf("pinned removal message missing:\n%s", viewText(&model))
+	}
+}
+
 func TestSkillStateBadgesUseSemanticColors(t *testing.T) {
 	want := map[catalog.State]color.Color{
 		catalog.StateActive:   lipgloss.Color("10"),
@@ -1540,6 +1665,52 @@ func TestCreatingGroupOpensSkillSelector(t *testing.T) {
 	}
 	if want := []string{"alpha", "beta"}; !slices.Equal(created.Skills, want) {
 		t.Fatalf("created group skills = %v, want %v", created.Skills, want)
+	}
+}
+
+func TestCreatingGroupPreselectsPinnedSkills(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	disabledDir := filepath.Join(root, "disabled")
+	groupsDir := filepath.Join(root, "groups")
+	pinsPath := filepath.Join(root, "pins.toml")
+	createSkill(t, activeDir, "alpha", "Alpha", "First skill")
+	createSkill(t, disabledDir, "beta", "Beta", "Second skill")
+	if _, err := pin.New(pinsPath).Add("beta"); err != nil {
+		t.Fatalf("pin skill: %v", err)
+	}
+
+	model, err := NewModel(paths.Set{
+		Active: activeDir, Disabled: disabledDir, Groups: groupsDir, Pins: pinsPath,
+		Journal: filepath.Join(root, "transaction.json"), Lock: filepath.Join(root, "lock"),
+	})
+	if err != nil {
+		t.Fatalf("new model: %v", err)
+	}
+	model.Update(keyText("g"))
+	model.Update(keyText("n"))
+	model.Update(keyText("coding"))
+	model.Update(keyCode(bubbletea.KeyEnter))
+
+	if !model.editorChosen["beta"] || model.editorChosen["alpha"] {
+		t.Fatalf("new group pin selection = %v, want beta only", model.editorChosen)
+	}
+	if !strings.Contains(viewText(&model), "[x] beta") || !strings.Contains(viewText(&model), "[ ] alpha") {
+		t.Fatalf("new group pin defaults missing:\n%s", viewText(&model))
+	}
+	model.Update(keyCode(bubbletea.KeyDown))
+	model.Update(keyText(" "))
+	if !model.editorChosen["beta"] || !strings.Contains(viewText(&model), "must stay in every group") {
+		t.Fatalf("pinned group skill could be removed:\n%s", viewText(&model))
+	}
+	model.Update(keyCode(bubbletea.KeyEnter))
+
+	created, err := group.New(groupsDir).Get("coding")
+	if err != nil {
+		t.Fatalf("read created group: %v", err)
+	}
+	if !slices.Equal(created.Skills, []string{"beta"}) {
+		t.Fatalf("created group skills = %v, want beta", created.Skills)
 	}
 }
 

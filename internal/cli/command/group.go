@@ -174,9 +174,30 @@ func newGroupRemove() *cobra.Command {
 		Short: "Remove skills from a group",
 		Args:  cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			pathSet, err := paths.Default()
+			if err != nil {
+				return err
+			}
 			store, _, err := groupContext()
 			if err != nil {
 				return err
+			}
+			pinned, err := loadPins(pathSet)
+			if err != nil {
+				return err
+			}
+			pinnedSet := make(map[string]struct{}, len(pinned))
+			for _, id := range pinned {
+				pinnedSet[id] = struct{}{}
+			}
+			blocked := make([]string, 0)
+			for _, id := range args[1:] {
+				if _, ok := pinnedSet[id]; ok {
+					blocked = append(blocked, id)
+				}
+			}
+			if len(blocked) > 0 {
+				return fmt.Errorf("cannot remove pinned skills from groups: %s; unpin first", strings.Join(blocked, ", "))
 			}
 			count, err := store.Remove(args[0], args[1:]...)
 			if err != nil {
